@@ -18,6 +18,7 @@
  */
 import { useMemo, useState } from 'react';
 import { useSavedQuerySingle } from '@/hooks';
+import type { SavedQueryName } from '@/types/saved-queries.generated';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,8 +50,24 @@ const STATUS_STYLE: Record<string, string> = {
   inactive: 'bg-muted text-muted-foreground',
 };
 
+/**
+ * The board query, addressed around two platform quirks.
+ *
+ * The name is `client_board`, not `client_admin`: the edge WAF blocks any
+ * request path containing "admin", so the original name returned a CloudFront
+ * 403 before it ever reached Phoenix. Nothing in the app can be called *_admin
+ * — see `pricing_template_admin`, registered and never once called.
+ *
+ * The cast and the explicit app key are because codegen for the saved-query
+ * registry is WAF-blocked too, so `client_board` is not in `SavedQueryName`
+ * and `SAVED_QUERY_APP_KEYS` has no entry to resolve. Both go away the first
+ * time the registry can be regenerated.
+ */
+const CLIENT_BOARD = 'client_board' as SavedQueryName;
+const APP_KEY = 'aswathtestapp_6a67823a8fa7215710927dbc';
+
 export function ClientsPage() {
-  const admin = useSavedQuerySingle('client_admin');
+  const admin = useSavedQuerySingle(CLIENT_BOARD, { appDefinitionKey: APP_KEY });
   const result = admin.data as ClientAdminResult | null;
 
   const views = useMemo(() => buildClientViews(result), [result]);

@@ -111,6 +111,12 @@ const ClientsPage = lazyWithPreload(() =>
   })),
 );
 
+const ReportsPage = lazyWithPreload(() =>
+  import('@/pages/reports/ReportsPage').then((module) => ({
+    default: module.ReportsPage,
+  })),
+);
+
 /**
  * Product name shown in the top bar. Shared with everything else that carries
  * the brand (including the supplier spec sheet) — see `@/pages/_shared/brand`
@@ -265,6 +271,12 @@ const ROUTES: PrivateRouteDeclaration[] = [
     label: 'Pricing',
     icon: 'icon_-Tb_file_dollar',
     element: <PricingTemplatesPage />,
+  }),
+  PrivateRoute({
+    path: '/reports',
+    label: 'Reports',
+    icon: 'icon_-Tb_chart_bar',
+    element: <ReportsPage />,
   }),
   // The SUPPLIER's own surface for one RFE. Hidden from the rail: in
   // production this is the link emailed to the supplier. It shows the spec,
