@@ -437,6 +437,39 @@ export interface AllocationCosts {
 }
 
 /**
+ * What a maker is actually owed per unit once materials are carved away.
+ *
+ * A carve-out moves the money as well as the work: the assembler no longer
+ * makes that material, so their own price for it comes off their unit cost and
+ * the carve-out maker charges for it separately. The deduction uses the
+ * ASSEMBLER's quote for the material rather than the carve-out maker's — what
+ * is being removed is what this supplier would have charged us, which is
+ * rarely the same number as what the other one charges.
+ *
+ * This is the figure the panel shows, the figure the line total is built from
+ * AND the figure written to `line_allocation`. It lives here because it was
+ * once computed in three places and the write path was the one that forgot:
+ * the panel previewed a carve-out order at $7,100 while the award, the supply
+ * order and the award record were all raised at $9,100 — paying the assembler
+ * in full for a carrier somebody else was making.
+ */
+export function assemblerUnitCostMicros(
+  orderLineId: string,
+  supplierId: string,
+  carveOuts: CarveOut[],
+  costs: AllocationCosts,
+): number {
+  const full = costs.unit(orderLineId, supplierId) ?? 0;
+  const removed = carveOuts.reduce(
+    (n, c) => n + (costs.material(orderLineId, supplierId, c.componentRole) ?? 0),
+    0,
+  );
+  // Clamped at zero: a supplier whose quoted materials exceed their own line
+  // total would otherwise come out negative and credit us for making the card.
+  return Math.max(0, full - removed);
+}
+
+/**
  * Roll a per-line split up into what the panel renders and the gate checks.
  *
  * A carve-out moves money as well as work: the assembler no longer makes that
@@ -466,15 +499,11 @@ export function allocationSummary(
         : rows.reduce((best, r) => ((r.qty || 0) > (best.qty || 0) ? r : best), rows[0])
             .supplierId || null;
 
-    const makerCost = rows.reduce((n, r) => {
-      const full = costs.unit(l.orderLineId, r.supplierId) ?? 0;
-      // What this maker no longer supplies.
-      const removed = carved.reduce(
-        (m, c) => m + (costs.material(l.orderLineId, r.supplierId, c.componentRole) ?? 0),
-        0,
-      );
-      return n + Math.max(0, full - removed) * (r.qty || 0);
-    }, 0);
+    const makerCost = rows.reduce(
+      (n, r) =>
+        n + assemblerUnitCostMicros(l.orderLineId, r.supplierId, carved, costs) * (r.qty || 0),
+      0,
+    );
 
     const carvedCost = carved.reduce(
       (n, c) => n + (costs.material(l.orderLineId, c.supplierId, c.componentRole) ?? 0) * l.qty,

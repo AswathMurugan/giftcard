@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { COMPONENT_ROLES, componentLabel } from './order-api';
 import {
   allocationSummary,
+  assemblerUnitCostMicros,
   money,
   unitMoney,
   type AllocationRow,
@@ -109,13 +110,10 @@ export function AllocationPanel({
     [lines, splits, carveOuts, costs],
   );
 
-  /** What this maker no longer supplies on this line, per unit. */
-  const carvedFrom = useCallback(
+  /** What this maker is owed per unit, net of anything carved away from them. */
+  const netUnit = useCallback(
     (line: { orderLineId: string; carveOuts: CarveOut[] }, supplierId: string) =>
-      line.carveOuts.reduce(
-        (n, c) => n + (costs.material(line.orderLineId, supplierId, c.componentRole) ?? 0),
-        0,
-      ),
+      assemblerUnitCostMicros(line.orderLineId, supplierId, line.carveOuts, costs),
     [costs],
   );
 
@@ -226,7 +224,14 @@ export function AllocationPanel({
           orderLineId: l.orderLineId,
           supplierId: r.supplierId,
           qty: r.qty,
-          unitCostMicros: unitCostFor(l.orderLineId, r.supplierId),
+          // NET of this line's carve-outs — the same number the row displayed.
+          // Writing the gross quote here is what raised IDEMIA's supply order
+          // for a carrier Travel Tags was making, and left the awarded cost
+          // above the price the client had already been quoted.
+          unitCostMicros:
+            unitCostFor(l.orderLineId, r.supplierId) === null
+              ? null
+              : assemblerUnitCostMicros(l.orderLineId, r.supplierId, l.carveOuts, costs),
           kind: 'line' as const,
           componentRole: null,
           assemblerId: null,
@@ -328,7 +333,7 @@ export function AllocationPanel({
                   {/* Net of anything carved away from this maker — they no
                       longer supply that material, so charging it to them here
                       would not reconcile with the line total below. */}
-                  {unit === null ? '—' : money(Math.max(0, unit - carvedFrom(line, row.supplierId)) * (row.qty || 0))}
+                  {unit === null ? '—' : money(netUnit(line, row.supplierId) * (row.qty || 0))}
                 </span>
                 <Button
                   size="sm"
