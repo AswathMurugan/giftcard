@@ -73,7 +73,7 @@ import type { ZzLeadProbeInput, ZzLeadProbeRow } from './saved-queries/aswathtes
 import type { ZzLeadProbeMultiInput, ZzLeadProbeMultiResult } from './saved-queries/aswathtestapp_6a67823a8fa7215710927dbc/zz_lead_probe_multi';
 
 /** All known saved-query names (typed union). */
-export type SavedQueryName = "allocation_clear_order" | "allocation_create" | "card_add" | "card_line_add" | "card_revs" | "card_spec_approve" | "card_spec_create" | "card_spec_create_v2" | "card_spec_pdf_save" | "card_spec_save" | "card_template_create" | "card_templates" | "card_variant_approve" | "card_variant_create" | "component_item_create" | "component_line_create" | "component_rev_create" | "margin_override_create" | "margin_override_supersede" | "my_tasks" | "order_allocation_grid" | "order_card_spec" | "order_card_variants" | "order_cards" | "order_create" | "order_detail" | "order_line_item_repair" | "order_link_tq" | "order_list" | "order_margin_overrides" | "order_quote_grid" | "order_rfes" | "party_list" | "pricing_template_admin" | "pricing_template_create" | "pricing_template_editor" | "pricing_template_role_create" | "pricing_template_role_update" | "pricing_template_update" | "pricing_templates" | "rfe_create" | "rfe_detail" | "rfe_line_create" | "rfe_mark_responded" | "rfe_response_detail" | "rfe_response_line_create" | "rfe_response_line_update" | "rfe_response_start" | "rfe_response_submit" | "rfe_tier_create" | "supplier_board" | "supplier_capacity_list" | "supplier_cert_list" | "supplier_list" | "supplier_price_list" | "task_board" | "task_list" | "tq_assign" | "tq_create" | "tq_stage_list" | "tq_state_add" | "tq_status_history" | "tq_sub_task_add" | "tq_sub_task_assign" | "unassigned_tasks" | "zz_lead_probe" | "zz_lead_probe_multi" | "order_fulfilment_grid" | "order_proposals" | "order_reviews" | "supplier_rfe_packet" | "order_plan" | "plan_create" | "plan_item_create" | "plan_item_stamp" | "plan_item_edit" | "plan_set_state" | "plan_item_pad" | "supply_line_create" | "allocation_bind_award" | "award_record_create";
+export type SavedQueryName = "allocation_clear_order" | "allocation_create" | "card_add" | "card_line_add" | "card_revs" | "card_spec_approve" | "card_spec_create" | "card_spec_create_v2" | "card_spec_pdf_save" | "card_spec_save" | "card_template_create" | "card_templates" | "card_variant_approve" | "card_variant_create" | "component_item_create" | "component_line_create" | "component_rev_create" | "margin_override_create" | "margin_override_supersede" | "my_tasks" | "order_allocation_grid" | "order_card_spec" | "order_card_variants" | "order_cards" | "order_create" | "order_detail" | "order_line_item_repair" | "order_link_tq" | "order_list" | "order_margin_overrides" | "order_quote_grid" | "order_rfes" | "party_list" | "pricing_template_admin" | "pricing_template_create" | "pricing_template_editor" | "pricing_template_role_create" | "pricing_template_role_update" | "pricing_template_update" | "pricing_templates" | "rfe_create" | "rfe_detail" | "rfe_line_create" | "rfe_mark_responded" | "rfe_response_detail" | "rfe_response_line_create" | "rfe_response_line_update" | "rfe_response_start" | "rfe_response_submit" | "rfe_tier_create" | "supplier_board" | "supplier_capacity_list" | "supplier_cert_list" | "supplier_list" | "supplier_price_list" | "task_board" | "task_list" | "tq_assign" | "tq_create" | "tq_stage_list" | "tq_state_add" | "tq_status_history" | "tq_sub_task_add" | "tq_sub_task_assign" | "unassigned_tasks" | "zz_lead_probe" | "zz_lead_probe_multi" | "order_fulfilment_grid" | "order_proposals" | "order_reviews" | "supplier_rfe_packet" | "order_plan" | "plan_create" | "plan_item_create" | "plan_item_stamp" | "plan_item_edit" | "plan_set_state" | "plan_item_pad" | "supply_line_create" | "allocation_bind_award" | "award_record_create" | "client_admin" | "client_create" | "client_update";
 
 /**
  * Master saved-query registry. Consumed by useSavedQueryList /
@@ -644,6 +644,27 @@ export interface SavedQuerySchema {
     appKey: "aswathtestapp_6a67823a8fa7215710927dbc";
     type: "dynamic";
   };
+  "client_admin": {
+    input: Record<string, unknown>;
+    row: Record<string, unknown>;
+    isSingle: true;
+    appKey: "aswathtestapp_6a67823a8fa7215710927dbc";
+    type: "multi_query";
+  };
+  "client_create": {
+    input: Record<string, unknown>;
+    row: Record<string, unknown>;
+    isSingle: false;
+    appKey: "aswathtestapp_6a67823a8fa7215710927dbc";
+    type: "dynamic";
+  };
+  "client_update": {
+    input: Record<string, unknown>;
+    row: Record<string, unknown>;
+    isSingle: false;
+    appKey: "aswathtestapp_6a67823a8fa7215710927dbc";
+    type: "dynamic";
+  };
   "zz_lead_probe_multi": {
     input: ZzLeadProbeMultiInput;
     row: ZzLeadProbeMultiResult;
@@ -751,6 +772,9 @@ export const SAVED_QUERY_APP_KEYS: Record<SavedQueryName, string> = {
   "supply_line_create": "aswathtestapp_6a67823a8fa7215710927dbc",
   "allocation_bind_award": "aswathtestapp_6a67823a8fa7215710927dbc",
   "award_record_create": "aswathtestapp_6a67823a8fa7215710927dbc",
+  "client_admin": "aswathtestapp_6a67823a8fa7215710927dbc",
+  "client_create": "aswathtestapp_6a67823a8fa7215710927dbc",
+  "client_update": "aswathtestapp_6a67823a8fa7215710927dbc",
 };
 
 /** Runtime map of saved-query name → query type (dynamic|sql|patch|…). */
@@ -836,6 +860,9 @@ export const SAVED_QUERY_TYPES: Record<SavedQueryName, string> = {
   "supply_line_create": "dynamic",
   "allocation_bind_award": "dynamic",
   "award_record_create": "dynamic",
+  "client_admin": "multi_query",
+  "client_create": "dynamic",
+  "client_update": "dynamic",
 };
 
 /** Runtime map of saved-query name → write op (insert|update|delete), '' for reads. */
@@ -921,4 +948,7 @@ export const SAVED_QUERY_OPERATIONS: Record<SavedQueryName, string> = {
   "supply_line_create": "write",
   "allocation_bind_award": "write",
   "award_record_create": "write",
+  "client_admin": "read",
+  "client_create": "write",
+  "client_update": "write",
 };

@@ -105,6 +105,12 @@ const StartOrderPage = lazyWithPreload(() =>
   })),
 );
 
+const ClientsPage = lazyWithPreload(() =>
+  import('@/pages/clients/ClientsPage').then((module) => ({
+    default: module.ClientsPage,
+  })),
+);
+
 /**
  * Product name shown in the top bar. Shared with everything else that carries
  * the brand (including the supplier spec sheet) — see `@/pages/_shared/brand`
@@ -245,6 +251,14 @@ const ROUTES: PrivateRouteDeclaration[] = [
     label: 'Suppliers',
     icon: 'icon_-Tb_building_factory_2',
     element: <SuppliersPage />,
+  }),
+  // Ops, not order work: Clients sits next to Suppliers and Pricing because
+  // the three of them are the reference data every order depends on.
+  PrivateRoute({
+    path: '/clients',
+    label: 'Clients',
+    icon: 'icon_-Tb_users',
+    element: <ClientsPage />,
   }),
   PrivateRoute({
     path: '/pricing',
