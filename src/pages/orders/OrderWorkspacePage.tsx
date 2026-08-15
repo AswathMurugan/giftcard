@@ -34,7 +34,7 @@ import {
   sendStageResponse,
   type StatusHistoryEntry,
 } from './order-api';
-import { decorateStages, type StageDefinition } from './stage-helpers';
+import { decorateStages, isFinalState, type StageDefinition } from './stage-helpers';
 import { PAGE_CONTAINER } from '@/pages/page-shell';
 import { SendForQuotesDialog } from './SendForQuotesDialog';
 import { RfeTable, type OrderRfeRow } from './RfeTable';
@@ -155,8 +155,8 @@ export function OrderWorkspacePage() {
     currentPosition(historyRows);
 
   const stages = useMemo(
-    () => decorateStages(stageRows, currentStageName),
-    [stageRows, currentStageName],
+    () => decorateStages(stageRows, currentStageName, currentStateName),
+    [stageRows, currentStageName, currentStateName],
   );
 
   const panel = currentStageName ? STAGE_PANELS[currentStageName] : undefined;
@@ -175,8 +175,14 @@ export function OrderWorkspacePage() {
   /**
    * The end of the line — the workflow has no further wait to signal, so no
    * stage card offers to advance past it.
+   *
+   * Arriving at Order Close is NOT the end: that stage runs Closing → Closed,
+   * and treating the stage as terminal withheld the one signal that finishes
+   * it, leaving every order parked in Closing with its last pip still gold.
+   * The end is the final STATE of the final stage, which the process
+   * definition already declares.
    */
-  const isClosed = currentStageName === 'Order Close';
+  const isClosed = isFinalState(stageRows, currentStageName, currentStateName);
 
 
   /**
@@ -444,8 +450,11 @@ export function OrderWorkspacePage() {
               stage={currentStageName ?? ''}
               clientId={order.buyer_party_id?.id ?? null}
               clientName={order.buyer_party_id?.name ?? null}
-              // At Order Close the run has finished: a signal there can only
-              // return ERROR_SIGNAL_NO_ACTIVE_WORKFLOW, so no card offers one.
+              closed={isClosed}
+              // Once the order is CLOSED the run really has finished: a signal
+              // then can only return ERROR_SIGNAL_NO_ACTIVE_WORKFLOW, so no
+              // card offers one. Up to that point Order Close still has its
+              // own signal to send.
               onProceed={isClosed ? undefined : handleAdvance}
             />
           </div>

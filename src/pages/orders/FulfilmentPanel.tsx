@@ -254,16 +254,24 @@ export function FulfilmentPanel({
   stage,
   clientId,
   clientName,
+  closed,
   onProceed,
 }: {
   orderId: string;
   orderCode: string;
   requestedDelivery?: string | null;
-  /** Award | Produce | Proof | Ship | Bill — decides what is editable. */
+  /** Award | Produce | Proof | Ship | Bill | Order Close — what is editable. */
   stage: string;
   /** Who the extras are billed to by default: the client on the demand order. */
   clientId: string | null;
   clientName: string | null;
+  /**
+   * The order has reached the final state of the final stage.
+   *
+   * Sitting ON Order Close is not the same thing — that stage runs Closing →
+   * Closed — so the last block needs telling which of the two it is showing.
+   */
+  closed?: boolean;
   onProceed?: () => Promise<void>;
 }) {
   const grid = useSavedQuerySingle('order_fulfilment_grid', {
@@ -298,6 +306,15 @@ export function FulfilmentPanel({
   );
   const proofs = useMemo(() => buildProofs(data?.reviews ?? []), [data]);
   const totals = useMemo(() => expenseTotals(expenses), [expenses]);
+  /** What actually left the building, and what the carriers charged for it. */
+  const despatchedUnits = useMemo(
+    () => progress.reduce((n, p) => n + p.shipped, 0),
+    [progress],
+  );
+  const freightMicros = useMemo(
+    () => progress.reduce((n, p) => n + p.costMicros, 0),
+    [progress],
+  );
   /**
    * Whether the live stage's work is actually finished.
    *
@@ -965,6 +982,62 @@ export function FulfilmentPanel({
             gate={gate}
             busy={busy}
             testId="proceed-close"
+            onProceed={onProceed}
+          />
+        ) : null}
+      </ChainBlock>
+
+      {/* ── Order Close ───────────────────────────────────────────────
+          The stage had no block at all: an order arrived here, every earlier
+          block went quiet, and there was nothing to press and nothing to
+          read. Closing is a real step with a real signal — Closing → Closed —
+          and this is where the finished order is stated. */}
+      <ChainBlock
+        title="Order Close"
+        state={closed ? 'approved' : stageState('Order Close', stage)}
+        summary={
+          closed
+            ? 'Closed'
+            : despatchedUnits > 0
+              ? `${despatchedUnits.toLocaleString()} units despatched · ready to close`
+              : 'Nothing despatched yet'
+        }
+        open={isOpen('Order Close')}
+        onToggle={() => toggle('Order Close')}
+      >
+        <div className="flex flex-col gap-1">
+          <Row
+            label="Supplier orders"
+            value={`${orders.length} raised`}
+          />
+          <Row
+            label="Despatched"
+            value={`${despatchedUnits.toLocaleString()} units to ${progress.length} destination${
+              progress.length === 1 ? '' : 's'
+            }`}
+          />
+          <Row label="Freight" value={money(freightMicros)} />
+          <Row
+            label="Billed extras"
+            value={
+              expenses.length === 0
+                ? 'None'
+                : `${money(totals.priceMicros)} · ${money(totals.marginMicros)} margin`
+            }
+          />
+        </div>
+        <p className="mt-2 text-[12.5px] text-muted-foreground">
+          {closed
+            ? 'Closed — the record is final. A change from here is a new order, not an edit to this one.'
+            : 'Closing files the order as finished. Nothing moves after it, so anything still owed to the client belongs above this line.'}
+        </p>
+        {stage === 'Order Close' ? (
+          <ProceedRow
+            label="Close the order"
+            hint="Files the order as complete."
+            gate={gate}
+            busy={busy}
+            testId="proceed-closed"
             onProceed={onProceed}
           />
         ) : null}

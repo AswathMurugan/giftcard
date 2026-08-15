@@ -316,6 +316,9 @@ export function unplannedUnits(
  *            proof was actually requested — an order cannot leave proofing
  *            without the client having signed the art
  *   Ship     something was planned, and every planned destination is complete
+ *   Order Close  the same, re-checked: this is the signal that files the order
+ *            as finished, and it is the last chance to refuse one that never
+ *            actually despatched
  *
  * Produce and Bill have no data-backed exit condition (production progress is
  * not tracked here, and billable extras are optional), so they are open.
@@ -389,6 +392,23 @@ export function stageGate(
       return {
         blocked: true,
         reason: `${input.unplannedUnits?.toLocaleString()} awarded units have no destination planned.`,
+      };
+    }
+    return open;
+  }
+
+  if (stage === 'Order Close') {
+    // Ship enforced this on the way past, but the workflow accepts a signal
+    // from wherever the order happens to be: closing one that never despatched
+    // files it as delivered work nobody sent, and closing is not reversible.
+    if (input.progress.length === 0) {
+      return { blocked: true, reason: 'Nothing was despatched — there is nothing to close.' };
+    }
+    const short = input.progress.filter((p) => p.state !== 'complete');
+    if (short.length > 0) {
+      return {
+        blocked: true,
+        reason: `${short.length} destination${short.length === 1 ? '' : 's'} never completed.`,
       };
     }
     return open;

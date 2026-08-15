@@ -68,20 +68,50 @@ export function orderStages(rows: StageDefinition[] | undefined): StageDefinitio
 }
 
 /**
+ * Has the order reached the LAST state of the stage it is sitting on?
+ *
+ * A stage is normally shown as finished by the order having moved past it, so
+ * the stage that is current is never the stage that is done. That rule cannot
+ * finish the LAST stage: nothing follows Order Close to push it into the past,
+ * so a delivered, invoiced, closed order still showed a gold "in progress" pip
+ * on the step that had actually completed.
+ *
+ * Stages carry their own states — Order Close runs `Closing` → `Closed` — and
+ * the final one of those is the real end. Read from the process definition
+ * rather than by matching on the name, so a renamed stage or an extra closing
+ * state keeps working.
+ */
+export function isFinalState(
+  rows: StageDefinition[] | undefined,
+  stageName: string | null | undefined,
+  stateName: string | null | undefined,
+): boolean {
+  if (!stageName || !stateName) return false;
+  const stage = (rows ?? []).find((r) => r.name === stageName);
+  return (stage?.states ?? []).some((s) => s.state === stateName && s.is_final);
+}
+
+/**
  * Decorate the ordered stages against the order's current stage NAME.
  *
  * Everything before the current stage is `done`, the match is `current`, the
  * rest `todo`. An unknown/absent current stage leaves every stage `todo`
  * rather than guessing a position.
+ *
+ * The current stage is `done` too once the order reaches that stage's final
+ * state — see `isFinalState`. Without the state the behaviour is unchanged,
+ * so a caller that has only the stage name still gets a sensible strip.
  */
 export function decorateStages(
   rows: StageDefinition[] | undefined,
   currentStageName: string | null | undefined,
+  currentStateName?: string | null,
 ): OrderedStage[] {
   const ordered = orderStages(rows);
   const currentIndex = currentStageName
     ? ordered.findIndex((s) => s.name === currentStageName)
     : -1;
+  const settled = isFinalState(rows, currentStageName, currentStateName);
 
   return ordered.map((stage, index) => ({
     id: stage.id as string,
@@ -92,7 +122,9 @@ export function decorateStages(
         : index < currentIndex
           ? 'done'
           : index === currentIndex
-            ? 'current'
+            ? settled
+              ? 'done'
+              : 'current'
             : 'todo',
     connector: index < ordered.length - 1,
   }));
