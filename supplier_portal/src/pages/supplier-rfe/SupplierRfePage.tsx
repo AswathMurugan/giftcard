@@ -239,7 +239,7 @@ export function SupplierRfePage() {
             uncosted: !isDeclined && !priced,
           };
         });
-      await recordSupplierQuote({
+      const { signalWarning } = await recordSupplierQuote({
         rfeId,
         // A re-quote opens the next round rather than overwriting the first.
         round: latestRound + 1,
@@ -250,7 +250,10 @@ export function SupplierRfePage() {
         lines,
       });
       await packetQuery.refetch();
-      setNote('Quote submitted. Thank you.');
+      // The quote is saved in both branches — only the buyer-side notification
+      // can fail. Reporting that plainly beats a blanket "Thank you" that would
+      // hide a stalled order, or an error that would imply the quote was lost.
+      setNote(signalWarning ?? 'Quote submitted. Thank you.');
     } catch (e) {
       setNote(`Could not submit: ${e instanceof Error ? e.message : String(e)}`);
     } finally {

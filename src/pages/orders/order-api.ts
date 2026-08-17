@@ -1154,6 +1154,22 @@ export function closeOrder(instanceId: string): Promise<unknown> {
   return runSavedQueryWithParams('tq_state_add', { instanceId, stateName: 'Closed' });
 }
 
+/**
+ * Close the quote-collection window without the suppliers who never answered.
+ *
+ * The Quote stage parks in a loop that counts the RFEs still marked `sent` and
+ * re-parks while any remain, so there is no "skip" signal to send — the way out
+ * is to make the count true. This flips the stragglers to `outdated`, after
+ * which the next `sendStageResponse` finds nothing outstanding and the stage
+ * falls through to Deal Review with the quotes that did arrive.
+ *
+ * Deliberately does NOT signal. The caller advances afterwards, so a failure
+ * here stops before anything is signalled rather than half-closing the round.
+ */
+export function closeOutstandingRfes(orderId: string): Promise<unknown> {
+  return runSavedQueryWithBody('rfe_close_outstanding', { orderId });
+}
+
 export function sendStageResponse(
   instanceId: string,
   payload: Record<string, unknown> = {},

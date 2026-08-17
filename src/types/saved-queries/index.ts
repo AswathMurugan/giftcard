@@ -31,6 +31,8 @@ export * from './aswathtestapp_6a67823a8fa7215710927dbc/order_link_tq';
 export * from './aswathtestapp_6a67823a8fa7215710927dbc/order_list';
 export * from './aswathtestapp_6a67823a8fa7215710927dbc/order_margin_overrides';
 export * from './aswathtestapp_6a67823a8fa7215710927dbc/order_quote_grid';
+export * from './aswathtestapp_6a67823a8fa7215710927dbc/order_activity_feed';
+export * from './aswathtestapp_6a67823a8fa7215710927dbc/order_quote_events';
 export * from './aswathtestapp_6a67823a8fa7215710927dbc/order_rfes';
 export * from './aswathtestapp_6a67823a8fa7215710927dbc/party_list';
 export * from './aswathtestapp_6a67823a8fa7215710927dbc/pricing_template_admin';

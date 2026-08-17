@@ -105,6 +105,46 @@ describe('Expired in the stage strip', { tags: ['orders', 'important'] }, () => 
     ]);
   });
 
+  /**
+   * `Expired` is an OUTCOME, not a step. Shown on every order it rendered a
+   * permanent dead-end pip after Order Close on healthy orders, implying a
+   * stage still to come that never arrives.
+   */
+  it('is hidden entirely on an order that never expired', { tags: ['important'] }, () => {
+    const healthy = decorateStages(STAGES, 'Quote', 'Quote Requested', [
+      'Order',
+      'Specs',
+      'Quote',
+    ]);
+    expect(healthy.map((s) => s.name)).toEqual(['Order', 'Specs', 'Quote', 'Order Close']);
+  });
+
+  it('is hidden on a closed order, whose strip ends at Order Close', { tags: ['important'] }, () => {
+    const closed = decorateStages(STAGES, 'Order Close', 'Closed', [
+      'Order',
+      'Specs',
+      'Quote',
+      'Order Close',
+    ]);
+    expect(closed.some((s) => s.name === 'Expired')).toBe(false);
+    expect(closed[closed.length - 1].name).toBe('Order Close');
+  });
+
+  it('still shows Expired once the order has expired', { tags: ['important'] }, () => {
+    const expired = decorateStages(STAGES, 'Expired', 'Expired', EXPIRED_AT_SPECS);
+    expect(expired.some((s) => s.name === 'Expired')).toBe(true);
+  });
+
+  /**
+   * With no trail at all the helper cannot tell a healthy order from an expired
+   * one, so it hides Expired rather than showing a dead end to every order.
+   */
+  it('hides Expired when there is no trail to judge by', { tags: ['edge-case'] }, () => {
+    expect(decorateStages(STAGES, 'Quote', 'Quote Requested').some((s) => s.name === 'Expired')).toBe(
+      false,
+    );
+  });
+
   it('marks the timed-out stage failed and everything unreached grey', { tags: ['important'] }, () => {
     const status = byName(decorateStages(STAGES, 'Expired', 'Expired', EXPIRED_AT_SPECS));
     expect(status).toEqual({

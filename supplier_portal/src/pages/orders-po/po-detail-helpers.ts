@@ -11,6 +11,7 @@
  * Pure functions, no DOM — the vitest environment here is `node`.
  */
 import { asText, asNumber } from '@/lib/runtime';
+import { isWorkflowNotTracking, signalErrorText } from '@/pages/_shared/signal-errors';
 import type { SupplierPoDetailRow } from '@/types/saved-queries.generated';
 import { PO_STAGES, NEXT_ACTION } from './po-helpers';
 
@@ -315,9 +316,8 @@ export function splitNote(myQty: number, parentQty: number | null): string | nul
  * Anything else is genuinely transient and worth retrying.
  */
 export function explainSignalFailure(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error ?? '');
-  if (/NO_ACTIVE_WORKFLOW|SIGNAL_DATA_GET/i.test(raw)) {
+  if (isWorkflowNotTracking(error)) {
     return 'This purchase order is not being tracked by the production workflow, so it cannot be advanced from here. Contact your Fiserv buyer to update it.';
   }
-  return `Could not update the order: ${raw || 'unknown error'}. Please try again.`;
+  return `Could not update the order: ${signalErrorText(error)}. Please try again.`;
 }

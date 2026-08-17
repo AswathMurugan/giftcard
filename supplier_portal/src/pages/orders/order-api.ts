@@ -28,6 +28,7 @@ import { apiManager } from '@/services/api-manager';
 import { getDataHeaders, getDataHeadersWithUser } from '@/config/api-config';
 import { getAuthService } from '@/config/auth-service-manager';
 import { logger } from '@/utils/logger';
+import { describeQuoteSignalFailure } from '@/pages/_shared/signal-errors';
 
 /** The tenant's single task-queue process (`tq_definition.name`). */
 export const TASK_DEFINITION_NAME = 'Gift Card Order';
@@ -501,7 +502,7 @@ export async function recordSupplierQuote(input: {
   commitsToDelivery: boolean;
   leadTimeWeeks: number | null;
   lines: SupplierQuoteLine[];
-}): Promise<{ responseId: string; lineCount: number }> {
+}): Promise<{ responseId: string; lineCount: number; signalWarning: string | null }> {
   const started = await runSavedQueryWithParams<unknown>('rfe_response_start', {
     rfeId: input.rfeId,
     round: input.round,
@@ -530,7 +531,63 @@ export async function recordSupplierQuote(input: {
 
   await runSavedQueryWithParams('rfe_mark_responded', { rfeId: input.rfeId });
 
-  return { responseId, lineCount: input.lines.length };
+  // Everything above is the quote itself and is now durable. This last call is
+  // the notification, and it is deliberately the LAST thing: the Quote stage's
+  // collection loop re-reads `rfe.status` on every signal, so the status flip
+  // has to have landed before the workflow is woken, or it would count this
+  // RFE as still outstanding and park again.
+  const signalWarning = await notifyOrderOfQuote(input.rfeId);
+
+  return { responseId, lineCount: input.lines.length, signalWarning };
+}
+
+/**
+ * Wake the buyer's order after a quote lands.
+ *
+ * The Quote stage parks on a signal named after the ORDER's `tq_instance` id,
+ * but a supplier screen only ever holds an `rfeId` — hence the lookup. The
+ * loop then counts the RFEs still marked `sent` and either parks again (other
+ * suppliers outstanding) or falls through to Deal Review (this was the last
+ * one). That is the whole mechanism: no payload is read from the signal, so
+ * the DB write above is the only thing that has to be right.
+ *
+ * Returns a warning string rather than throwing. The quote is already saved at
+ * this point; failing the submit here would send a supplier back to re-key a
+ * quote that is already in the system, which is a worse outcome than an order
+ * that a buyer has to advance by hand.
+ */
+async function notifyOrderOfQuote(rfeId: string): Promise<string | null> {
+  try {
+    const row = await runSavedQueryWithParams<unknown>('rfe_order_instance', { rfeId });
+    const instanceId = readOrderInstanceId(row);
+    if (!instanceId) {
+      return 'Your quote was saved. The buyer’s order has no workflow instance, so it was not advanced automatically.';
+    }
+    await sendStageResponse(instanceId, { rfeId });
+    return null;
+  } catch (error) {
+    logger.warn('Quote saved but the order signal failed', { rfeId, error });
+    return describeQuoteSignalFailure(error);
+  }
+}
+
+/**
+ * Dig the order's tq_instance id out of the `rfe_order_instance` response.
+ *
+ * Written against `unknown` on purpose. The generated types describe what
+ * Phoenix DECLARES, not what it returns, and this value is three links deep
+ * (rfe → demand_order → tq_instance) — any hop can come back null for an order
+ * that was never wired to a workflow. Reading it optimistically would throw
+ * inside a submit handler that has already written the supplier's quote.
+ */
+function readOrderInstanceId(row: unknown): string | null {
+  if (!row || typeof row !== 'object') return null;
+  const order = (row as { demand_order?: unknown }).demand_order;
+  if (!order || typeof order !== 'object') return null;
+  const instance = (order as { tq_instance?: unknown }).tq_instance;
+  if (!instance || typeof instance !== 'object') return null;
+  const id = (instance as { id?: unknown }).id;
+  return typeof id === 'string' && id.trim() ? id : null;
 }
 
 /** One awarded quantity on an order line. */

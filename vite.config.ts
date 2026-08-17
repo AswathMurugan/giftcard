@@ -12,6 +12,22 @@ const isBackendManagedCloudPreview = process.env.BOOTSTRAP_MODE === 'cloud'
 
 // https://vite.dev/config/
 export default defineConfig({
+  /**
+   * Pre-bundle the deps that only a LAZY chunk imports.
+   *
+   * `react-pdf` is reached solely through `lazy(() => import(PdfPane))`, so it
+   * is absent from Vite's start-up scan. The first time a user opens a
+   * document dialog, Vite DISCOVERS it, re-optimizes, and every module hash
+   * the open page is holding becomes stale — the in-flight lazy import then
+   * dies as "Failed to fetch dynamically imported module", which the error
+   * boundary catches and shows as a broken dialog. Listing it here means it is
+   * bundled at server start and no mid-session re-optimize is ever triggered.
+   *
+   * Any future dependency reachable ONLY from a lazy chunk belongs here too.
+   */
+  optimizeDeps: {
+    include: ["react-pdf"],
+  },
   plugins: [selectiveGeneratedTypeImportsPlugin(), react(), tailwindcss(), appTitleHtmlPlugin(), jiffyHmrControlPlugin(), envAwareProxyPlugin()],
   resolve: {
     alias: {

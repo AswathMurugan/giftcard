@@ -34,8 +34,10 @@ import {
   closeOrder,
   sendStageResponse,
   type StatusHistoryEntry,
+  closeOutstandingRfes,
 } from './order-api';
 import { decorateStages, type StageDefinition } from './stage-helpers';
+import { collectionStatusLine, canProceedWithoutStragglers } from './quote-collection';
 import { PAGE_CONTAINER } from '@/pages/page-shell';
 import { SendForQuotesDialog } from './SendForQuotesDialog';
 import { RfeTable, type OrderRfeRow } from './RfeTable';
@@ -43,6 +45,7 @@ import { CardSummary } from './CardSummary';
 import { QuoteGrid } from './QuoteGrid';
 import { DecisionChain } from './DecisionChain';
 import { FulfilmentPanel } from './FulfilmentPanel';
+import { ActivityPanel } from './ActivityPanel';
 
 interface OrderDetailRow {
   id?: string;
@@ -152,6 +155,13 @@ export function OrderWorkspacePage() {
     enabled: Boolean(orderId),
   });
   const rfeRows = (rfes.data ?? []) as OrderRfeRow[];
+
+
+  // Derived from the RFE rows the page already has, so the screen agrees with
+  // the workflow's own count without a second query.
+  const collectionNote = collectionStatusLine(rfeRows);
+  const showProceedWithout = canProceedWithoutStragglers(rfeRows);
+
   const { stage: currentStageName, state: currentStateName } =
     currentPosition(historyRows);
 
@@ -246,6 +256,34 @@ export function OrderWorkspacePage() {
    * RFEs exist, move on", never "please create them", so nothing here writes
    * business data.
    */
+  /**
+   * Close the quote window without the suppliers who never answered.
+   *
+   * Order matters and is not interchangeable: the RFEs are closed FIRST, then
+   * the order is signalled. The Quote stage's loop re-counts open RFEs on
+   * every signal, so signalling first would find them still outstanding and
+   * simply park again — the click would appear to do nothing.
+   */
+  async function handleProceedWithoutStragglers() {
+    if (!instanceId) return;
+    setSignalBusy(true);
+    setSignalNote(null);
+    try {
+      await closeOutstandingRfes(orderId);
+      await rfes.refetch();
+    } catch (e) {
+      setSignalBusy(false);
+      setSignalNote(
+        `Could not close the quote window: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return;
+    }
+    setSignalBusy(false);
+    // Reuses the ordinary advance so the "did it actually move" polling and
+    // its reporting stay in one place.
+    await handleAdvance();
+  }
+
   async function handleAdvance() {
     if (!instanceId) return;
     setSignalBusy(true);
@@ -337,10 +375,8 @@ export function OrderWorkspacePage() {
      * stage panel below scrolls, so which order this is and where it has got
      * to remain on screen while the operator works down the card studio.
      */
-    <div
-      className="flex h-full min-h-0 w-full flex-col px-7 pt-8"
-      data-testid="order-workspace-page"
-    >
+    <div className="flex h-full min-h-0 w-full" data-testid="order-workspace-page">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col px-7 pt-8">
       <div className="shrink-0">
       {/* ── Breadcrumb ───────────────────────────────────────────── */}
       <Breadcrumb className="mb-3">
@@ -460,6 +496,32 @@ export function OrderWorkspacePage() {
                   <>
                     <RfeTable rows={rfeRows} loading={rfes.isLoading} />
                     <QuoteGrid orderId={orderId} />
+                    {/* The workflow is parked in its collection loop and will
+                        move on by itself when the last supplier answers, so
+                        this says what it is waiting for rather than offering a
+                        button that would do nothing. */}
+                    {collectionNote ? (
+                      <p
+                        className="text-[13.5px] text-muted-foreground"
+                        data-testid="quote-collection-note"
+                      >
+                        {collectionNote}
+                      </p>
+                    ) : null}
+                    {showProceedWithout ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="self-start"
+                        data-testid="proceed-without-suppliers"
+                        disabled={signalBusy}
+                        aria-busy={signalBusy}
+                        title="Close the quote window and review the quotes already in"
+                        onClick={handleProceedWithoutStragglers}
+                      >
+                        Proceed without the remaining suppliers
+                      </Button>
+                    ) : null}
                     {/* NOT a second "send for quotes" — the details already
                         went out at Specs. This adds a supplier to a round
                         that is already open, so it does not advance the
@@ -591,6 +653,14 @@ export function OrderWorkspacePage() {
         </div>
       ) : null}
 
+      {/* The rail's stand-in below `xl`, where the fixed right column would
+          leave the stage cards too narrow. Only one of the two is ever
+          rendered, and both read the same query key, so this costs no extra
+          request. */}
+      <div className="mt-6 border-t border-border xl:hidden">
+        <ActivityPanel orderId={orderId} instanceId={instanceId} />
+      </div>
+
       </div>
 
       {/* RFEs are written here, then the stage advances — never the reverse.
@@ -612,6 +682,24 @@ export function OrderWorkspacePage() {
         }}
       />
       ) : null}
+    </div>
+
+    {/* ── Activity, the full height of the page ─────────────────────────
+        A companion rail, not part of the stage panel.
+
+        It sits OUTSIDE the content column and outside its padding, so it
+        starts level with the breadcrumb and runs to the bottom edge — the
+        trail is context for the whole ORDER, and nesting it inside the
+        scrolling work implied it belonged to whichever stage happened to be
+        current. Out here it also gets the vertical room a 30-entry trail
+        needs, and the work column no longer competes with it for height.
+
+        `xl:` only. Below that the rail would leave the cards too narrow to
+        use, so it renders at the end of the content column instead (see the
+        stacked copy above the dialog). */}
+    <aside className="hidden w-[21rem] shrink-0 border-l border-border bg-background xl:flex xl:flex-col">
+      <ActivityPanel orderId={orderId} instanceId={instanceId} />
+    </aside>
     </div>
   );
 }

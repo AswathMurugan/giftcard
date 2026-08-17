@@ -38,3 +38,7 @@ tmp/
 .env
 .env.*
 !.env.example
+
+# Per-portal Vite dep caches (see each portal's vite.config.ts cacheDir)
+.vite-relay/
+.vite-vista/

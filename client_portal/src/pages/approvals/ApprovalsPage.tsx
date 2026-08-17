@@ -79,7 +79,7 @@ export function ApprovalsPage() {
     setBusy(true);
     setProblem(null);
     try {
-      const { certificateProblem } = await decideProposal(
+      const { certificateProblem, signalProblem } = await decideProposal(
         signing,
         'accepted',
         `Signed by ${signature.trim()}`,
@@ -90,9 +90,17 @@ export function ApprovalsPage() {
       toast.success(`${signing.orderCode} — proposal v${signing.version} accepted`, {
         testId: 'toast-proposal-accepted',
       });
-      // The signature stuck; only the certificate did not. Say which.
-      if (certificateProblem) {
-        setProblem(certificateProblem);
+      /**
+       * The signature stuck in every branch below; only a follow-on step did
+       * not. Say which, rather than showing a generic failure that would read
+       * as "your signature was lost".
+       *
+       * The certificate is reported first: a missing signed record matters more
+       * to the client than a stalled hand-off to production, which their
+       * account team will notice anyway.
+       */
+      if (certificateProblem || signalProblem) {
+        setProblem(certificateProblem ?? signalProblem);
         setBusy(false);
         return;
       }

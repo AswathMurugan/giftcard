@@ -157,15 +157,37 @@ export function decorateStages(
   currentStateName?: string | null,
   visitedStageNames?: Iterable<string>,
 ): OrderedStage[] {
-  const ordered = orderStages(rows);
-  const currentIndex = currentStageName
-    ? ordered.findIndex((s) => s.name === currentStageName)
-    : -1;
-  const settled = isFinalState(rows, currentStageName, currentStateName);
+  const allStages = orderStages(rows);
   const trail = visitedStageNames ? [...visitedStageNames] : null;
   const visited = trail ? new Set(trail) : null;
   // Non-null only when the trail records an expiry.
   const failedStage = trail ? failedStageOf(trail) : null;
+
+  /**
+   * `Expired` is shown ONLY on an order that actually expired.
+   *
+   * It is not a step in the lifecycle — it is an outcome reachable from
+   * anywhere, which is why it carries no `previous_task`/`next_task` and sorts
+   * last. Rendering it on every order put a permanent dead-end pip after Order
+   * Close on healthy orders, implying a stage still to come that will never
+   * arrive. A closed order's strip should end at Order Close.
+   *
+   * It stays visible while the order IS expired (current stage) or its trail
+   * records an expiry, so the outcome is never hidden on the orders it applies
+   * to.
+   */
+  const ordered = allStages.filter(
+    (s) =>
+      s.name !== EXPIRED_STAGE ||
+      currentStageName === EXPIRED_STAGE ||
+      Boolean(failedStage) ||
+      Boolean(visited?.has(EXPIRED_STAGE)),
+  );
+
+  const currentIndex = currentStageName
+    ? ordered.findIndex((s) => s.name === currentStageName)
+    : -1;
+  const settled = isFinalState(rows, currentStageName, currentStateName);
 
   return ordered.map((stage, index) => {
     const name = stage.name ?? '—';

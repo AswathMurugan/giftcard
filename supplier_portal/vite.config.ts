@@ -12,6 +12,35 @@ const isBackendManagedCloudPreview = process.env.BOOTSTRAP_MODE === 'cloud'
 
 // https://vite.dev/config/
 export default defineConfig({
+  /**
+   * Pre-bundle the deps that only a LAZY chunk imports.
+   *
+   * `react-pdf` is reached solely through `lazy(() => import(PdfPane))`, so it
+   * is absent from Vite's start-up scan. The first time a user opens a
+   * document dialog, Vite DISCOVERS it, re-optimizes, and every module hash
+   * the open page is holding becomes stale — the in-flight lazy import then
+   * dies as "Failed to fetch dynamically imported module", which the error
+   * boundary catches and shows as a broken dialog. Listing it here means it is
+   * bundled at server start and no mid-session re-optimize is ever triggered.
+   *
+   * Any future dependency reachable ONLY from a lazy chunk belongs here too.
+   */
+  optimizeDeps: {
+    include: ["react-pdf"],
+  },
+  /**
+   * A dependency cache of this app's OWN, outside node_modules.
+   *
+   * All three portals' `node_modules` are SYMLINKS to the repo root's, so the
+   * default cacheDir (`node_modules/.vite`) resolves to the SAME directory for
+   * Forge, Relay and Vista. Three dev servers then optimize deps into one
+   * cache, each rewriting the `browserHash` the others handed to already-open
+   * tabs. Those tabs keep requesting `?v=<old hash>` and get
+   * `504 (Outdated Optimize Dep)` — which surfaces as a blank page, or as
+   * "Failed to fetch dynamically imported module" the first time a lazy chunk
+   * is needed. Giving each app its own cache removes the interference.
+   */
+  cacheDir: path.resolve(__dirname, ".vite-relay"),
   plugins: [selectiveGeneratedTypeImportsPlugin(), react(), tailwindcss(), appTitleHtmlPlugin(), jiffyHmrControlPlugin(), envAwareProxyPlugin()],
   resolve: {
     alias: {
