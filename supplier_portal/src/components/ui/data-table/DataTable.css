@@ -1,0 +1,183 @@
+/*
+ * DataTable visual overrides.
+ *
+ * Scoped under `.ui-data-table` so AG Grid instances rendered outside this
+ * component aren't affected. Three groups:
+ *
+ *   1. Hide per-column header chrome (sort indicator, filter funnel,
+ *      3-dot menu button) on idle. Show on hover, OR when sort/filter is
+ *      active on that column.
+ *
+ *   2. Hide the vertical column separators in the header.
+ *
+ *   3. Alternating row stripes using the project's `--muted` token.
+ *
+ * Mirrors the renderer's libs/composite/table/src/styles.css (lines
+ * 411-480, 824-869, 691-696) — adapted to the starter's CSS variables.
+ */
+
+/* ── 1. Header chrome — idle hidden, hover/active visible ──────────────── */
+
+.ui-data-table .ag-sort-indicator-container,
+.ui-data-table .ag-header-icon,
+.ui-data-table .ag-header-cell-menu-button {
+  display: none;
+}
+
+.ui-data-table .ag-header-cell:hover .ag-sort-indicator-container,
+.ui-data-table .ag-header-cell:hover .ag-header-icon,
+.ui-data-table .ag-header-cell:hover .ag-header-cell-menu-button {
+  display: flex;
+  align-items: center;
+}
+
+/* Keep the menu (⋮) button shown WHILE its column menu/filter is open.
+ * The open popup is anchored to this button; AG Grid runs an interval that
+ * hides the popup as soon as the anchor's getBoundingClientRect() is all-zero.
+ * Because the rules above hide the button (display:none) once the header loses
+ * :hover, moving the mouse off the header zeroed the anchor and snapped the
+ * open filter shut (and made the operator dropdown unreachable). AG adds
+ * `ag-column-menu-visible` to the header cell while the menu is open — reveal
+ * the button for that state so the anchor keeps a real box. Idle-hidden chrome
+ * is preserved (button still hidden until hover otherwise). */
+.ui-data-table .ag-header-cell.ag-column-menu-visible .ag-header-icon,
+.ui-data-table .ag-header-cell.ag-column-menu-visible .ag-header-cell-menu-button {
+  display: flex;
+  align-items: center;
+}
+
+/* Always show sort indicator on the actively-sorted column */
+.ui-data-table .ag-header-cell-sorted-asc .ag-sort-indicator-container,
+.ui-data-table .ag-header-cell-sorted-desc .ag-sort-indicator-container {
+  display: flex;
+  align-items: center;
+}
+
+/* Always show filter icon on a column with an active filter */
+.ui-data-table .ag-header-cell-filtered .ag-header-icon {
+  display: flex;
+  align-items: center;
+}
+
+/* ── 2. Column header right border (DS .jf-dt thead th:not(:last-child)) ─ */
+/* The DS draws a 1px Primary-300 divider to the right of each header cell
+ * except the last. AG Grid's default `::after` pseudo-separator is hidden in
+ * favour of a real border so it picks up the gold tint. */
+
+.ui-data-table .ag-header-cell::after,
+.ui-data-table .ag-header-group-cell::after {
+  display: none;
+}
+
+.ui-data-table .ag-header-row .ag-header-cell:not(:last-child),
+.ui-data-table .ag-header-row .ag-header-group-cell:not(:last-child) {
+  border-right: 1px solid var(--color-primary-300);
+}
+
+/* ── 2b. Hide the right-side "Columns" tab strip ──────────────────────── */
+/* AG Grid renders a vertical tab strip whenever `sideBar` is configured.
+ * Our top-toolbar columns button already opens the same panel, so the
+ * strip is redundant. Panel functionality stays intact. */
+
+.ui-data-table .ag-side-buttons {
+  display: none;
+}
+
+
+
+/* ── 3. No zebra stripes (DS .jf-dt uses hover, not alternating fills) ─── */
+/* oddRowBackgroundColor is already `transparent` in the theme; nothing to
+ * override here. (Intentionally no `.ag-row-odd` rule.) */
+
+/* ── 4. Header label slightly bolder (matches design) ─────────────────── */
+
+.ui-data-table .ag-header-cell-text {
+  font-weight: 600;
+}
+
+/* ── 5. Gold table-wrap border + 0.625rem (10px) radius (DS .jf-dt__table-wrap) ─ */
+
+.ui-data-table .ag-root-wrapper {
+  border-color: var(--color-primary-200);
+  border-radius: 0.625rem;
+}
+
+/* ── 6. Initial-load skeleton shimmer (renderer parity) ───────────────── */
+/* Each placeholder cell is a gray-200 block with a left-to-right shimmer
+ * sweep painted by a ::after gradient. Mirrors the renderer's
+ * libs/composite/table styles.css `ui-table-skeleton__cell`. */
+
+.ui-data-table .ui-dt-skeleton-cell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  background: var(--color-grayscale-200);
+}
+
+.ui-data-table .ui-dt-skeleton-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 100%
+  );
+  animation: ui-dt-skeleton-shimmer 1.5s infinite;
+}
+
+@keyframes ui-dt-skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-data-table .ui-dt-skeleton-cell::after {
+    animation: none;
+  }
+}
+
+/* ── 7. Vertically center cell content + restore DS line-height ───────
+ * Quartz centers plain cell text with a row-height line-height:
+ * `.ag-cell { line-height: calc(min(var(--ag-row-height), …) - 3px) }`
+ * (≈43px at our 2.875rem rowHeight). That inherits INTO renderer content:
+ * <Badge> deliberately sets no `leading-*` (it expects the DS-inherited
+ * 1.4 — see badge.tsx), so inside a cell its text line box became ~43px
+ * and the `rounded-full` pill ballooned into a circle taller than the row.
+ * Fix both halves:
+ *   - flex + align-items:center → renderers keep intrinsic height and are
+ *     vertically centered (this replaces line-height centering);
+ *   - line-height:1.4 → cell content inherits the DS body line-height
+ *     again, so badges/chips get their ~24.5px pill back.
+ * `.ag-cell-value` already carries `flex:1 1 auto`, so plain text and
+ * `rightAligned` columns keep filling the width and honour `text-align`.
+ * Editing cells are excluded so the inline editor still fills the cell. */
+.ui-data-table .ag-cell:not(.ag-cell-inline-editing) {
+  display: flex;
+  align-items: center;
+  line-height: 1.4;
+}
+
+/* ── 8. Scrollbars visible only on hover / keyboard focus ─────────────────
+ * By default AG Grid keeps the horizontal + vertical scrollbars painted at all
+ * times. Fade them out on idle and reveal them when the pointer is over the
+ * table (or a cell is keyboard-focused). The scroll elements keep their layout
+ * box (only opacity animates), so nothing shifts — the bars just appear on
+ * hover. Scrolling by wheel/trackpad is unaffected. */
+.ui-data-table .ag-body-horizontal-scroll,
+.ui-data-table .ag-body-vertical-scroll {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ui-data-table:hover .ag-body-horizontal-scroll,
+.ui-data-table:hover .ag-body-vertical-scroll,
+.ui-data-table:focus-within .ag-body-horizontal-scroll,
+.ui-data-table:focus-within .ag-body-vertical-scroll {
+  opacity: 1;
+}

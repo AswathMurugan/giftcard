@@ -1,0 +1,40 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+/test-results/
+
+# Per-session workspaces (created by scripts/new-session.sh)
+tmp/
+
+# Chat journals (pi session transcripts). In cloud these are written INSIDE
+# the workspace (SESSION_ROOT=/workspace/.sessions), and the per-turn save
+# stages with `git add -A` — without this rule the full conversation
+# transcript gets committed into the app repo. Must stay in sync with
+# GITIGNORE_CONTENT in backend-node/src/bootstrap/repo.ts.
+.sessions/
+
+# Secrets
+.env
+.env.*
+!.env.example

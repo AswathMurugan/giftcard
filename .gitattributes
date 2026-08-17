@@ -1,0 +1,38 @@
+# PHX-4247 — keep AGENT-OWNED files on the APP's version through a starter sync.
+#
+# The starter is merged into each app repo on version bumps (runtime
+# `merge --squash` in backend-node/src/bootstrap/starterSync.ts, and the
+# `starterSync` pipeline's `git merge -X theirs`). Without this, the starter's
+# scaffold version of these files (e.g. PrivateApp.tsx with an EMPTY ROUTES
+# array) overwrites the agent's page registrations — pages vanish from the nav.
+#
+# Marking them `merge=ours` makes git keep the app's version on a merge. This
+# requires `git config merge.ours.driver true` in the repo doing the merge
+# (set by both starter-sync paths). When that config is absent git just falls
+# back to a normal 3-way merge, so shipping this attribute is safe by default.
+#
+# NOTE: `merge=ours` only affects files that exist on BOTH sides (conflicts).
+# Brand-new files the starter adds are still merged in normally.
+src/PrivateApp.tsx merge=ours
+src/PrivateApp.test.ts merge=ours
+src/pages/** merge=ours
+
+# ...EXCEPT the pages the STARTER owns and routes itself. They are platform
+# surfaces — the preference viewer, review UI, log viewer, test-results view
+# and the demos — not the user's app, so a starter fix to
+# them MUST reach existing apps. Under `merge=ours` it never could: that rule
+# only spares files present on BOTH sides, so an app kept its frozen copy
+# forever while brand-new starter files merged in normally. PHX-5837 hit this
+# exactly — `review-bridge.ts` landed in live apps, `ReviewPage.tsx` did not.
+#
+# `!merge` makes the attribute UNSPECIFIED so git runs its normal 3-way merge
+# and the sync's `-X theirs` picks the starter's side. (`-merge` would be the
+# opposite: unmergeable, keep ours.) Git honours the LAST matching pattern, so
+# these must stay below the `src/pages/**` line above.
+src/pages/error-boundary-demo/** !merge
+src/pages/getting-started/** !merge
+src/pages/log-viewer/** !merge
+src/pages/preference-viewer/** !merge
+src/pages/review/** !merge
+src/pages/showcase/** !merge
+src/pages/test-results/** !merge

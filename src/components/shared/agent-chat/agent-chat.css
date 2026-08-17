@@ -1,0 +1,234 @@
+/**
+ * Agent chat styles — the parts Tailwind utilities can't express:
+ * body-level layout reserve, ::-webkit-scrollbar, and @keyframes.
+ *
+ * Colocated + imported by AgentChat.tsx (same pattern as DataTable.css), so
+ * the styles ship only when the chat is actually used.
+ */
+
+/* ── Agent chat: docked-panel layout reserve ────────────────────────────────
+   When `<AgentChat>` is docked left/right it renders a full-height fixed rail.
+   These rules pad the app root so page content sits BESIDE the panel instead of
+   being overlaid by it. The class is toggled on <body> by the component and
+   removed on unmount, so an app that never docks the chat is unaffected.
+   Keep the width in sync with DOCK_WIDTH_REM in
+   src/components/shared/agent-chat/dock-mode.ts. */
+body.chat-docked--left #root {
+  padding-left: var(--agent-chat-dock-width, 25rem);
+}
+
+body.chat-docked--right #root {
+  padding-right: var(--agent-chat-dock-width, 25rem);
+}
+
+/* While dragging the resize handle: kill text selection and keep the resize
+   cursor even when the pointer outruns the handle. */
+body.chat-resizing {
+  cursor: ew-resize;
+  user-select: none;
+}
+
+/* Below the panel's width there isn't room for both — the panel overlays
+   instead, matching how a mobile drawer behaves. */
+@media (max-width: 60rem) {
+  body.chat-docked--left #root,
+  body.chat-docked--right #root {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* Slim scrollbar for the chat's scrolling areas (message thread + history).
+   Not expressible as Tailwind utilities — ::-webkit-scrollbar has no variant —
+   so it ships as one class applied to each scroll container. */
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-grayscale-300) transparent;
+}
+
+.chat-scroll::-webkit-scrollbar {
+  width: 0.5rem;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--color-grayscale-300);
+  border-radius: 0.25rem;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-grayscale-400);
+}
+
+/* Soft fade at the top and bottom edges so rows scroll out gracefully instead
+   of clipping hard against the panel border / the composer beneath it.
+   Separate from `.chat-scroll` on purpose: the message thread should NOT fade
+   (it would dim the newest reply as it approaches the composer). */
+.chat-scroll-fade {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 0.5rem,
+    #000 calc(100% - 0.5rem),
+    transparent
+  );
+}
+
+/* ── Chat enter animations ──────────────────────────────────────────────────
+   The floating popover rises into place; a docked panel slides in from the
+   edge it pins to; the history view slides in from the left. Durations match
+   the platform (0.2s panels, 0.16s history). */
+
+.chat-anim-float {
+  animation: chat-popover-in 0.2s ease-out forwards;
+}
+
+.chat-anim-dock-left {
+  animation: chat-dock-left-in 0.2s ease-out forwards;
+}
+
+.chat-anim-dock-right {
+  animation: chat-dock-right-in 0.2s ease-out forwards;
+}
+
+.chat-anim-history {
+  animation: chat-history-in 0.16s ease-out forwards;
+}
+
+/* Exit animations — the panel stays mounted until `animationend` fires, then
+   unmounts. Reverse of the matching enter, with ease-IN. */
+
+.chat-anim-float-out {
+  animation: chat-popover-out 0.2s ease-in forwards;
+}
+
+.chat-anim-dock-left-out {
+  animation: chat-dock-left-out 0.2s ease-in forwards;
+}
+
+.chat-anim-dock-right-out {
+  animation: chat-dock-right-out 0.2s ease-in forwards;
+}
+
+@keyframes chat-popover-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.96);
+  }
+}
+
+@keyframes chat-dock-left-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-1rem);
+  }
+}
+
+@keyframes chat-dock-right-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+}
+
+@keyframes chat-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes chat-dock-left-in {
+  from {
+    opacity: 0;
+    transform: translateX(-1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes chat-dock-right-in {
+  from {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes chat-history-in {
+  from {
+    opacity: 0;
+    transform: translateX(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Going BACK from history — reverse of the entrance (fade + slide left). */
+.chat-anim-history-out {
+  animation: chat-history-out 0.16s ease-in forwards;
+}
+
+@keyframes chat-history-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-0.5rem);
+  }
+}
+
+/* A resize drag must not animate — the panel would lag the pointer. */
+body.chat-resizing .chat-anim-dock-left,
+body.chat-resizing .chat-anim-dock-right {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-anim-float,
+  .chat-anim-dock-left,
+  .chat-anim-dock-right,
+  .chat-anim-history,
+  /* Safe to disable outright: the history unmount is driven by a TIMER, not
+     `animationend`, so killing the animation can't strand the panel. */
+  .chat-anim-history-out {
+    animation: none;
+  }
+
+  /* The EXIT animations keep a near-zero duration rather than `none`: the
+     unmount is driven by `animationend`, and `animation: none` would never
+     fire it, leaving the panel stuck on screen. */
+  .chat-anim-float-out,
+  .chat-anim-dock-left-out,
+  .chat-anim-dock-right-out {
+    animation-duration: 0.01ms;
+  }
+}

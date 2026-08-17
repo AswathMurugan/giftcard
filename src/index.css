@@ -1,0 +1,560 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/source-sans-3";
+/* Nucleo icon font (vendored from @ui-base/primitive_icon) — the platform's
+   icon system. Use it as `<i className="icon icon_-Tb_<name>" />` (e.g.
+   icon_-Tb_calendar). PHX-3941. */
+@import "./assets/fonts/nucleo/nucleo.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ──────────────────────────────────────────────────────────────────────
+   Phoenix renderer-aligned design tokens (PHX-3863, Task 1).
+   Mirrors apps/renderer/src/styles/tokens.css colour ramps + typography
+   so the cloned app's surfaces look identical to renderer-served
+   content. Per-tenant runtime overrides (font-family, primary accent,
+   logo, favicon) are applied at runtime by BrandingProvider via
+   usePreferences() — it sets the same CSS variables on :root so tenant
+   values trump these static defaults.
+
+   Skipped from the renderer set (per Task 1 scope): width-intent,
+   min-width, min-height, max-height, z-index scales.
+   ────────────────────────────────────────────────────────────────────── */
+
+:root {
+    /* ── shadcn semantic tokens ──────────────────────────────────────
+       These back the API every shadcn primitive + project page uses
+       (`bg-primary`, `text-secondary-foreground`, `bg-card`, `border-border`,
+       …). They are ALIASED to the renderer `--color-*` ramps declared
+       further down this block, so when `applyTheme` (src/lib/apply-theme.ts)
+       rewrites the ramps at runtime from the tenant's `App.Theme`, every
+       shadcn component re-colours through the cascade — no per-token JS.
+
+       Aliases point at the ramp whose static value already equals the
+       previous hard-coded hex, so the default look is unchanged. NOTE the
+       semantic mismatch: shadcn `--secondary` is a LIGHT surface, so it
+       maps to `--color-grayscale-100` (#F4F4F5), NOT `--color-secondary`
+       (#1C1C1C, a near-black text colour in the renderer ramps).
+
+       `--destructive` stays literal (an `oklch()` value not tenant-themed).
+       `--chart-1..5` now reference the Phoenix brand ramps (primary/teal/
+       purple/info/pink) so charts are on-brand and re-theme through the
+       cascade — PHX-3941 replaced the old generic-green oklch set. */
+    --background: var(--color-monochrome-white);
+    --foreground: var(--color-grayscale-900);
+    --card: var(--color-monochrome-white);
+    --card-foreground: var(--color-grayscale-900);
+    --popover: var(--color-monochrome-white);
+    --popover-foreground: var(--color-grayscale-900);
+    --primary: var(--color-primary);
+    --primary-foreground: var(--color-on-primary);
+    --primary-50: var(--color-primary-50);
+    --primary-200: var(--color-primary-200);
+    --primary-600: var(--color-primary-600);
+    --primary-800: var(--color-primary-800);
+    --secondary: var(--color-grayscale-100);
+    --secondary-foreground: var(--color-grayscale-900);
+    --muted: var(--color-grayscale-100);
+    --muted-foreground: var(--color-grayscale-500);
+    --accent: var(--color-primary-50);
+    --accent-foreground: var(--color-grayscale-900);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: var(--color-grayscale-200);
+    --input: var(--color-grayscale-300);
+    --ring: var(--color-primary-200);
+    /* Chart series — Phoenix brand families (PHX-3941). Replaces the old
+       generic-green oklch set, which was off-brand. References the ramps so
+       they re-theme through the cascade + tenant applyTheme. */
+    --chart-1: var(--color-primary-500);
+    --chart-2: var(--color-teal-500);
+    --chart-3: var(--color-purple-500);
+    --chart-4: var(--color-info-500);
+    --chart-5: var(--color-pink-500);
+    --radius: 0.45rem;
+    --sidebar: var(--color-grayscale-50);
+    --sidebar-foreground: var(--color-grayscale-900);
+    --sidebar-primary: var(--color-primary);
+    --sidebar-primary-foreground: var(--color-on-primary);
+    --sidebar-accent: var(--color-primary-50);
+    --sidebar-accent-foreground: var(--color-grayscale-900);
+    --sidebar-border: var(--color-grayscale-200);
+    --sidebar-ring: var(--color-primary-200);
+
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Phoenix renderer colour ramps — registered in a PLAIN `@theme` block
+   (NOT `@theme inline`) so Tailwind v4 GENERATES the colour utilities
+   (`bg-primary`, `bg-primary-200`, `text-info-700`, `border-danger-500`,
+   …) from these `--color-*` keys. A plain `@theme` also emits each value
+   onto `:root` as the first-paint default; at runtime `applyTheme`
+   (src/lib/apply-theme.ts) rewrites the same `--color-*` names inline on
+   `<html>` from the tenant's `App.Theme` (or DEFAULT_THEME when null), so
+   every utility re-colours through the cascade — no per-token JS.
+
+   IMPORTANT (Tailwind v4): keys declared in a plain `:root{}` block are
+   INVISIBLE to the utility generator. They MUST live in `@theme` or the
+   utilities are never emitted (this was the secondary==outline bug).
+
+   The renderer `secondary` ramp is intentionally omitted: its main value
+   is near-black (#1C1C1C), which would invert shadcn's `bg-secondary`
+   (a light surface). shadcn `--color-secondary` is mapped to
+   `--color-grayscale-100` in the `@theme inline` block below instead, and
+   no component uses `bg-secondary-<n>` numbered shades. */
+@theme {
+    /* primary (Phoenix Gold) */
+    --color-primary: #9e7b19;
+    --color-primary-50: #f9f4e1;
+    --color-primary-100: #f6edc9;
+    --color-primary-200: #f1e2a9;
+    --color-primary-300: #d6c16a;
+    --color-primary-400: #bfa238;
+    --color-primary-500: #9e7b19;
+    --color-primary-600: #8a6a15;
+    --color-primary-700: #745711;
+    --color-primary-800: #5e460e;
+    --color-primary-900: #443308;
+    --color-primary-950: #2b2004;
+    --color-on-primary: #ffffff;
+
+    /* info */
+    --color-info: #075985;
+    --color-info-50: #f2f8fc;
+    --color-info-100: #ddeef8;
+    --color-info-200: #b8d7ec;
+    --color-info-300: #86b8db;
+    --color-info-400: #3f8fbf;
+    --color-info-500: #075985;
+    --color-info-600: #064e73;
+    --color-info-700: #05405e;
+    --color-info-800: #04324a;
+    --color-info-900: #032435;
+    --color-info-950: #021725;
+
+    /* success */
+    --color-success: #005928;
+    --color-success-50: #f2f8f4;
+    --color-success-100: #ddeee4;
+    --color-success-200: #b8dbc8;
+    --color-success-300: #86bf9e;
+    --color-success-400: #3f8f62;
+    --color-success-500: #005928;
+    --color-success-600: #004d22;
+    --color-success-700: #00401c;
+    --color-success-800: #003316;
+    --color-success-900: #00240f;
+    --color-success-950: #001707;
+
+    /* warning */
+    --color-warning: #d96a2b;
+    --color-warning-50: #fff7ef;
+    --color-warning-100: #ffe9d9;
+    --color-warning-200: #ffd1b3;
+    --color-warning-300: #ffb68a;
+    --color-warning-400: #f7935d;
+    --color-warning-500: #d96a2b;
+    --color-warning-600: #b85722;
+    --color-warning-700: #94461b;
+    --color-warning-800: #703514;
+    --color-warning-900: #4d240e;
+    --color-warning-950: #331707;
+
+    /* danger */
+    --color-danger: #8b1200;
+    --color-danger-50: #fdf2f1;
+    --color-danger-100: #f9ddda;
+    --color-danger-200: #f2b8b3;
+    --color-danger-300: #e48880;
+    --color-danger-400: #c94b3f;
+    --color-danger-500: #8b1200;
+    --color-danger-600: #7a1000;
+    --color-danger-700: #660d00;
+    --color-danger-800: #520a00;
+    --color-danger-900: #3d0700;
+    --color-danger-950: #260400;
+
+    /* grayscale */
+    --color-grayscale: #1c1c1c;
+    --color-grayscale-50: #fafafa;
+    --color-grayscale-100: #f4f4f5;
+    --color-grayscale-200: #e4e4e7;
+    --color-grayscale-300: #d4d4d8;
+    --color-grayscale-400: #a8abb1;
+    --color-grayscale-500: #73767c;
+    --color-grayscale-600: #535862;
+    --color-grayscale-700: #3f434a;
+    --color-grayscale-800: #2b2f36;
+    --color-grayscale-900: #1c1c1c;
+    --color-grayscale-950: #000000;
+
+    /* monochrome (utility shades for chrome / dividers / overlays) */
+    --color-monochrome-ash: #282c36;
+    --color-monochrome-body: #535862;
+    --color-monochrome-label: #73767c;
+    --color-monochrome-placeholder: #a0a3bd;
+    --color-monochrome-line: #c9cacd;
+    --color-monochrome-input: #e9e9ea;
+    --color-monochrome-bg: #f4f4f5;
+    --color-monochrome-off-white: #fcfcfc;
+    --color-monochrome-off-black: #000000;
+    --color-monochrome-white: #ffffff;
+    --color-monochrome-black: #000000;
+
+    /* ── Extended families (PHX-3941, from JiffyAI Design System 2) ──────
+       Teal / Purple / Pink / Tan — for data-viz series, category tags, and
+       tenant theming. Same 50–950 structure as the core families. These are
+       new utility colors (`bg-teal-500`, `text-purple-700`, …); they are
+       safelisted below so they're always available even before a page uses
+       them. */
+    --color-teal-50: #eaf6f5;
+    --color-teal-100: #cfe9e6;
+    --color-teal-200: #a8d6d0;
+    --color-teal-300: #7fc1b9;
+    --color-teal-400: #4fa79e;
+    --color-teal-500: #2c8f86;
+    --color-teal-600: #257b73;
+    --color-teal-700: #1f6660;
+    --color-teal-800: #18514c;
+    --color-teal-900: #113c39;
+    --color-teal-950: #0a2624;
+
+    --color-purple-50: #f3eff8;
+    --color-purple-100: #e3d9f0;
+    --color-purple-200: #cabbe4;
+    --color-purple-300: #af9ad6;
+    --color-purple-400: #9f74c3;
+    --color-purple-500: #7357ae;
+    --color-purple-600: #634a97;
+    --color-purple-700: #533e80;
+    --color-purple-800: #433169;
+    --color-purple-900: #322452;
+    --color-purple-950: #201735;
+
+    --color-pink-50: #fbeff3;
+    --color-pink-100: #f5d8e1;
+    --color-pink-200: #efb8ca;
+    --color-pink-300: #e493b0;
+    --color-pink-400: #d66c94;
+    --color-pink-500: #c54a78;
+    --color-pink-600: #ab3f68;
+    --color-pink-700: #8f3457;
+    --color-pink-800: #742947;
+    --color-pink-900: #571e36;
+    --color-pink-950: #381324;
+
+    --color-tan-50: #faf6ef;
+    --color-tan-100: #f0e4d1;
+    --color-tan-200: #e2cfb1;
+    --color-tan-300: #d1b58c;
+    --color-tan-400: #bd9966;
+    --color-tan-500: #a47e45;
+    --color-tan-600: #8f6d3c;
+    --color-tan-700: #785b32;
+    --color-tan-800: #614929;
+    --color-tan-900: #49371f;
+    --color-tan-950: #2f2314;
+
+    /* red (alias of danger) + accent extras the renderer uses sparingly */
+    --color-red-400: #c94b3f;
+    --color-cyan-600: #0891b2;
+    --color-orient-blue-600: #0369a1;
+}
+
+.dark {
+    --background: #1C1C1C;
+    --foreground: #FAFAFA;
+    /* Neutral-gray surfaces (was cool blue-slate #2B2F36 / #3F434A / #535862,
+       which clashed with the neutral #1C1C1C background). Elevation preserved:
+       background #1C1C1C < card #262626 < muted/hover #323232 < border #3A3A3A
+       < input #4A4A4A. */
+    --card: #262626;
+    --card-foreground: #FAFAFA;
+    --popover: #262626;
+    --popover-foreground: #FAFAFA;
+    --primary: #BFA238;
+    --primary-foreground: #1C1C1C;
+    --primary-50: #2B2004;
+    --primary-200: #443308;
+    --primary-600: #D6C16A;
+    --primary-800: #F1E2A9;
+    --secondary: #323232;
+    --secondary-foreground: #FAFAFA;
+    --muted: #323232;
+    --muted-foreground: #A8ABB1;
+    --accent: #323232;
+    --accent-foreground: #FAFAFA;
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: #3A3A3A;
+    --input: #4A4A4A;
+    --ring: #5E460E;
+    /* Brand-gold ramp INVERTED for dark mode: -50 darkest brown → -950 lightest
+       cream (reverse of the fixed @theme light ramp). So bg-primary-50 surfaces
+       (banners, icon tiles, hovers) turn dark, while text-primary-600/700 and
+       border-primary-* become readable golds on dark. These override the utility
+       source vars in `.dark` scope; runtime branding still wins because
+       applyTheme writes them as INLINE styles (higher priority than a class). */
+    --color-primary-50: #2b2004;
+    --color-primary-100: #443308;
+    --color-primary-200: #5e460e;
+    --color-primary-300: #745711;
+    --color-primary-400: #8a6a15;
+    --color-primary-500: #9e7b19;
+    --color-primary-600: #bfa238;
+    --color-primary-700: #d6c16a;
+    --color-primary-800: #f1e2a9;
+    --color-primary-900: #f6edc9;
+    --color-primary-950: #f9f4e1;
+    /* Chart series — lighter (-400) brand stops for contrast on dark surfaces. */
+    --chart-1: var(--color-primary-400);
+    --chart-2: var(--color-teal-400);
+    --chart-3: var(--color-purple-400);
+    --chart-4: var(--color-info-400);
+    --chart-5: var(--color-pink-400);
+    --sidebar: #262626;
+    --sidebar-foreground: #FAFAFA;
+    --sidebar-primary: #BFA238;
+    --sidebar-primary-foreground: #1C1C1C;
+    --sidebar-accent: #323232;
+    --sidebar-accent-foreground: #FAFAFA;
+    --sidebar-border: #3A3A3A;
+    --sidebar-ring: #5E460E;
+}
+
+@theme inline {
+    /* `--font-family-primary` is the runtime override slot. At runtime
+       BrandingProvider's applyTheme writes it onto `:root` from
+       `App.Theme.fontFamily.primary` when present; static fallback is
+       Source Sans 3 (the codegen-starter default).
+       Mirrors the renderer's tokens.css:147-150 convention. */
+    --font-sans:
+        var(--font-family-primary), 'Source Sans 3 Variable', 'Source Sans 3',
+        ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    /* Font size scale — JiffyAI design system.
+       Sizes are in REM so text scales with the user's root font-size
+       preference (WCAG 1.4.4 Resize Text). Base is 1rem = 16px (no px
+       `html { font-size }` pin), so the rem values below equal the design
+       system's px spec: 0.75rem=12px, 0.875rem=14px, 1rem=16px,
+       1.0625rem=17px, 1.125rem=18px, 1.3125rem=21px, 1.5rem=24px,
+       1.75rem=28px. Body/base = 16px and small = 14px per the JiffyAI
+       design system (.jf-body / .jf-body-sm). Line-heights stay unitless. */
+    --text-xs: 0.75rem;
+    --text-xs--line-height: 1.4;
+    --text-sm: 0.875rem;
+    --text-sm--line-height: 1.4;
+    --text-base: 1rem;
+    --text-base--line-height: 1.45;
+    --text-md: 1rem;
+    --text-md--line-height: 1.45;
+    --text-lg: 1.0625rem;
+    --text-lg--line-height: 1.3;
+    --text-xl: 1.125rem;
+    --text-xl--line-height: 1.3;
+    --text-2xl: 1.3125rem;
+    --text-2xl--line-height: 1.25;
+    --text-3xl: 1.5rem;
+    --text-3xl--line-height: 1.2;
+    --text-display: 1.75rem;
+    --text-display--line-height: 1.15;
+
+    /* ── Renderer typography scale (PHX-3863) ─────────────────────
+       Dual-track (desktop × mobile) × (heading × body) × 5 sizes
+       each. Plus letter-spacing, line-height, font-weight scales.
+       Copied verbatim from apps/renderer/src/styles/tokens.css so
+       generated pages can use the same rem values the renderer
+       paints. */
+    --text-2xs: 0.625rem;
+    --text-2xs--line-height: 1.4;
+
+    --font-size-desktop-h-huge: 4rem;
+    --font-size-desktop-h-large: 3.5rem;
+    --font-size-desktop-h-medium: 3.625rem;
+    --font-size-desktop-h-small: 2rem;
+    --font-size-desktop-h-x-small: 1.5rem;
+    --font-size-desktop-b-huge: 1.3125rem;
+    --font-size-desktop-b-large: 1.1875rem;
+    --font-size-desktop-b-medium: 1.0625rem;
+    --font-size-desktop-b-small: 1rem;
+    --font-size-desktop-b-x-small: 0.875rem;
+
+    --font-size-mobile-h-huge: 2.125rem;
+    --font-size-mobile-h-large: 1.75rem;
+    --font-size-mobile-h-medium: 1.5rem;
+    --font-size-mobile-h-small: 1.25rem;
+    --font-size-mobile-h-x-small: 1.25rem;
+    --font-size-mobile-b-huge: 1.25rem;
+    --font-size-mobile-b-large: 1.25rem;
+    --font-size-mobile-b-medium: 1.0625rem;
+    --font-size-mobile-b-small: 1rem;
+    --font-size-mobile-b-x-small: 0.875rem;
+
+    --letter-spacing-desktop-h-huge: 0.0625rem;
+    --letter-spacing-desktop-h-large: 0.0625rem;
+    --letter-spacing-desktop-h-medium: 0.0625rem;
+    --letter-spacing-desktop-h-small: 0.0625rem;
+    --letter-spacing-desktop-h-x-small: 0.0625rem;
+    --letter-spacing-desktop-b-huge: 0.03125rem;
+    --letter-spacing-desktop-b-large: 0.03125rem;
+    --letter-spacing-desktop-b-medium: 0.03125rem;
+    --letter-spacing-desktop-b-small: 0.015625rem;
+    --letter-spacing-desktop-b-x-small: 0.015625rem;
+
+    --letter-spacing-mobile-h-huge: 0.0625rem;
+    --letter-spacing-mobile-h-large: 0.0625rem;
+    --letter-spacing-mobile-h-medium: 0.0625rem;
+    --letter-spacing-mobile-h-small: 0.0625rem;
+    --letter-spacing-mobile-h-x-small: 0.0625rem;
+    --letter-spacing-mobile-b-huge: 0.046875rem;
+    --letter-spacing-mobile-b-large: 0.046875rem;
+    --letter-spacing-mobile-b-medium: 0.046875rem;
+    --letter-spacing-mobile-b-small: 0.015625rem;
+    --letter-spacing-mobile-b-x-small: 0.015625rem;
+
+    /* Custom letter-spacing utilities (tracking-xxs … tracking-xxl) */
+    --letter-spacing-xxs: 0rem;
+    --letter-spacing-xs: 0.0125rem;
+    --letter-spacing-s: 0.025rem;
+    --letter-spacing-m: 0.05rem;
+    --letter-spacing-l: 0.075rem;
+    --letter-spacing-xl: 0.1rem;
+    --letter-spacing-xxl: 0.15rem;
+
+    --line-height-desktop-h-huge: 5.5rem;
+    --line-height-desktop-h-large: 4.5rem;
+    --line-height-desktop-h-medium: 3.5rem;
+    --line-height-desktop-h-small: 3rem;
+    --line-height-desktop-h-x-small: 2rem;
+    --line-height-desktop-b-huge: 2rem;
+    --line-height-desktop-b-large: 2rem;
+    --line-height-desktop-b-medium: 1.5rem;
+    --line-height-desktop-b-small: 1.375rem;
+    --line-height-desktop-b-x-small: 1.25rem;
+
+    --line-height-mobile-h-huge: 3rem;
+    --line-height-mobile-h-large: 2.5rem;
+    --line-height-mobile-h-medium: 2.125rem;
+    --line-height-mobile-h-small: 2rem;
+    --line-height-mobile-h-x-small: 2rem;
+    --line-height-mobile-b-huge: 2rem;
+    --line-height-mobile-b-large: 2rem;
+    --line-height-mobile-b-medium: 1.75rem;
+    --line-height-mobile-b-small: 1.5rem;
+    --line-height-mobile-b-x-small: 1.375rem;
+
+    --font-weight-light: 300;
+    --font-weight-regular: 400;
+    --font-weight-semi-bold: 600;
+    --font-weight-bold: 700;
+    --font-weight-x-bold: 800;
+
+    /* ── shadcn semantic-token aliases ─────────────────────────── */
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --color-primary-foreground: var(--primary-foreground);
+    /* shadcn `--color-primary` and the renderer ramps (`--color-primary-50`,
+       `--color-info-700`, `--color-grayscale-200`, …) are registered in the
+       PLAIN `@theme {}` block above so Tailwind generates their utilities
+       AND `applyTheme` can override them at runtime. They are intentionally
+       NOT re-declared here — a `var()` alias in `@theme inline` would shadow
+       the raw ramp and break runtime theming. The semantic tokens above
+       (`--color-background`, `--color-secondary`, `--color-muted`, …) stay
+       `inline` because they're indirection over those ramps / the `.dark`
+       overrides, not colour sources themselves. */
+
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+
+    /* ── Named shadow tokens (PHX-3941, from JiffyAI Design System 2) ────
+       Generates `shadow-xs … shadow-pop` utilities. Very soft, flat-surface
+       elevation — use shadow-xs on cards, shadow-md on popovers, shadow-pop
+       on modals. No large blurred / neon shadows. */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.1);
+    --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* Safelist the extended color utilities (PHX-3941) so they're always
+   emitted even before a generated page references them — the agent can use
+   bg-/text-/border- with teal/purple/pink/tan at any stop. Tailwind v4
+   `@source inline(...)` with brace-expansion. */
+@source inline("{bg,text,border,ring,fill,stroke}-{teal,purple,pink,tan}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("shadow-{xs,sm,md,lg,pop}");
+/* Status badge tints + the new -50 stops (PHX-3941). */
+@source inline("{bg,text,border}-{success,info,warning,danger}-{50,100,200,500}");
+
+/* Per-tenant branding (theme colours, font-family, logo, favicon) is
+   applied at RUNTIME by BrandingProvider (src/components/branding-provider.tsx)
+   via usePreferences(). It writes the same CSS variables declared above
+   onto :root, so tenant values trump these static first-paint defaults.
+   When the tenant has no `App.Theme`, DEFAULT_THEME re-asserts these
+   values (no flash). Nothing here is code-generated. */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground text-base;
+    /* Default body size = 16px (`--text-base`, the design-system body
+       default `.jf-body`) so text the agent doesn't explicitly size renders
+       at the DS size instead of the browser default — keeps output consistent.
+       The agent overrides per-element with the type-scale classes. */
+    /* Resolve the per-tenant runtime font-family if set, else fall through
+       to --font-sans (which the @theme block resolves the same way
+       internally — kept here for non-Tailwind selectors). */
+    font-family: var(
+      --font-family-primary,
+      'Source Sans 3 Variable',
+      'Source Sans 3',
+      ui-sans-serif,
+      system-ui,
+      sans-serif
+    );
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+    }
+  html {
+    @apply font-sans antialiased;
+    text-rendering: optimizeLegibility;
+    }
+}
