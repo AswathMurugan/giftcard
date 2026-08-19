@@ -22,8 +22,27 @@ import type { SupplierPoParentsRow } from '@/types/saved-queries.generated';
  */
 export const SUPPLIER_VISIBLE_KIND = 'proof';
 
-/** Rounds the supplier is expected to act on: artwork not yet uploaded. */
-const AWAITING_UPLOAD = new Set(['requested', 'awaiting_upload', 'not_requested', '']);
+/**
+ * Statuses that mean the round is NOT waiting on the supplier's artwork.
+ *
+ * Expressed as the settled set rather than the owed set, deliberately. The
+ * previous allowlist — `requested`, `awaiting_upload`, `not_requested`, `''` —
+ * omitted the one status the system actually writes: `review_request_create`
+ * opens a round as **`open`**, so a freshly requested proof matched nothing
+ * and Relay told the supplier "nothing waiting on your artwork" while Forge
+ * showed the same row as "awaiting upload, with Supplier". The supplier was
+ * never shown what they owed.
+ *
+ * Forge already resolves this the safe way round — `toProofStatus` treats
+ * anything it does not recognise as `awaiting_upload` — so this mirrors it. An
+ * unknown status now reads as "you may owe artwork", which is the harmless
+ * direction to be wrong in: the worst case is a supplier looks at a round that
+ * turns out to be settled, rather than never seeing one that is not.
+ *
+ * `changes_requested` sits here because rejection opens a NEW round; that next
+ * round is the one carrying the obligation, not the rejected one.
+ */
+const SETTLED = new Set(['approved', 'in_review', 'awaiting_sign', 'changes_requested']);
 
 export interface ParentOrderOption {
   orderId: string;
@@ -104,7 +123,7 @@ export function decorateSupplierProofs(rows: RawReview[] | undefined): SupplierP
       const status = asText(r.status).toLowerCase();
       // An uploaded file settles it regardless of what the status column says:
       // the artwork is demonstrably no longer owed.
-      const awaitingUpload = !r.proof_file_name && AWAITING_UPLOAD.has(status);
+      const awaitingUpload = !r.proof_file_name && !SETTLED.has(status);
       return {
         id: r.id as string,
         proofType: asText(r.proof_type) || 'Proof',

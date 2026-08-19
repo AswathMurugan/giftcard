@@ -39,6 +39,8 @@ import {
 import { decorateStages, type StageDefinition } from './stage-helpers';
 import { collectionStatusLine, canProceedWithoutStragglers } from './quote-collection';
 import { PAGE_CONTAINER } from '@/pages/page-shell';
+import { advanceNote } from '@/pages/_shared/advance-feedback';
+import { describeAdvanceFailure } from '@/pages/_shared/signal-errors';
 import { SendForQuotesDialog } from './SendForQuotesDialog';
 import { RfeTable, type OrderRfeRow } from './RfeTable';
 import { CardSummary } from './CardSummary';
@@ -305,12 +307,15 @@ export function OrderWorkspacePage() {
        * the blocks re-render — so saying so as well was noise. A signal that
        * changed nothing, or failed, has no visible trace, so it is written
        * beside the strip where it stays until the next attempt.
+       *
+       * `before` — the state we tried to leave — decides the wording. A
+       * guarded stage did not move BECAUSE the counterparty has not acted
+       * yet, and telling that person to refresh sends them round a loop that
+       * cannot end. See `advance-feedback.ts`.
        */
-      setSignalNote(
-        moved ? null : 'Signal sent, but no new state was reported yet — try Refresh.',
-      );
+      setSignalNote(advanceNote(before, moved));
     } catch (e) {
-      setSignalNote(`Signal failed: ${e instanceof Error ? e.message : String(e)}`);
+      setSignalNote(describeAdvanceFailure(e));
     } finally {
       setSignalBusy(false);
     }

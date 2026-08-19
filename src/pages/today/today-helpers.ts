@@ -1,3 +1,5 @@
+import { businessDaysUntil, workingTimeLeft } from '@/pages/_shared/business-hours';
+
 /**
  * Pure helpers for the Today queue — extracted so they can be unit-tested
  * without rendering React.
@@ -112,6 +114,44 @@ export function slaLabel(days: number | null): string {
   return `${days} days left`;
 }
 
+/**
+ * Urgency measured the way capacity actually works (US-702).
+ *
+ * Deliberately NOT a change to `urgencyOf`, which stays a pure function of one
+ * number and keeps its own contract. This is the composed rule the queue uses:
+ *
+ *  - already late → `late`, judged on CALENDAR days, because that is how long
+ *    the client has really been waiting;
+ *  - otherwise → judged on WORKING days, because that is the capacity left.
+ *
+ * The second half is the fix. Viewed on a Friday, a Monday deadline is one
+ * working day away; counting calendar days called it three and left it sitting
+ * quietly at the bottom of the board.
+ */
+export function urgencyFor(
+  calendarDays: number | null,
+  businessDays: number | null,
+  terminal = false,
+): Urgency {
+  if (terminal) return 'ontrack';
+  if (calendarDays === null) return 'ontrack';
+  if (calendarDays < 0) return 'late';
+  if (businessDays === null) return 'ontrack';
+  return businessDays <= 3 ? 'soon' : 'ontrack';
+}
+
+/**
+ * The pill text: calendar days for lateness, working days for time left.
+ * "14 days late" is what a person says; "2 working days left" is what an
+ * operator needs.
+ */
+export function slaFor(calendarDays: number | null, businessDays: number | null): string {
+  if (calendarDays === null) return 'No date';
+  if (calendarDays < 0) return slaLabel(calendarDays);
+  if (calendarDays === 0) return 'Due today';
+  return workingTimeLeft(businessDays);
+}
+
 /** `2026-07-29` → `Jul 29`. Falls back to the raw value when unparseable. */
 export function shortDate(due: string | undefined | null): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(due ?? '');
@@ -160,6 +200,8 @@ export interface DecoratedTask {
   state: string | null;
   days: number | null;
   urgency: Urgency;
+  /** Working days left — null when there is no usable date. */
+  businessDays: number | null;
   sla: string;
   due: string;
   assigneeLabel: string | null;
@@ -178,6 +220,7 @@ export function decorateTasks(
   return (rows ?? [])
     .map((row, index) => {
       const days = daysUntil(row.requested_delivery, today);
+      const businessDays = businessDaysUntil(row.requested_delivery, today);
       const assignee = row.tq_instance?.assignee;
       const stage = stageOf(row);
       const state = stateOf(row);
@@ -191,8 +234,9 @@ export function decorateTasks(
         stage,
         state,
         days,
-        urgency: urgencyOf(days, terminal),
-        sla: terminal ? 'Closed' : slaLabel(days),
+        businessDays,
+        urgency: urgencyFor(days, businessDays, terminal),
+        sla: terminal ? 'Closed' : slaFor(days, businessDays),
         due: shortDate(row.requested_delivery),
         assigneeLabel: assignee
           ? (assignee.full_name || assignee.email || null)

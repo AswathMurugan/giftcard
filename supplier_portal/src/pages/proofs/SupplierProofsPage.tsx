@@ -11,13 +11,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { useSavedQueryList } from '@/hooks';
+import { useSavedQueryList, useDriveFiles } from '@/hooks';
+import { Button } from '@/components/ui/button';
+import { saveProofDocument } from '@/pages/orders/order-api';
 import { PAGE_CONTAINER } from '@/pages/page-shell';
 import { useSupplierSession } from '@/pages/_shared/supplier-session';
 import { SupplierSwitcher } from '@/pages/_shared/SupplierSwitcher';
 import type { SupplierPoParentsRow } from '@/types/saved-queries.generated';
 import {
   decorateSupplierProofs,
+  type SupplierProofRow,
   parentOptions,
   type RawReview,
 } from './supplier-proof-helpers';
@@ -65,6 +68,47 @@ export function SupplierProofsPage() {
   );
   const selected = options.find((o) => o.orderId === orderId) ?? null;
   const owed = rows.filter((r) => r.awaitingUpload).length;
+
+  /**
+   * Supplier-side proof upload (US-601).
+   *
+   * The same Drive scope and the same write Forge uses, so a proof attached
+   * here and one CS attaches on the supplier's behalf are one artefact — the
+   * client's approval must not point at a different file depending on who
+   * happened to upload it.
+   */
+  const drive = useDriveFiles();
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleProofFile(row: SupplierProofRow, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Cleared straight away so re-picking the SAME file still fires `change`.
+    e.target.value = '';
+    if (!file) return;
+
+    setUploadingId(row.id);
+    setUploadError(null);
+    try {
+      const result = await drive.upload(file, {
+        scope: 'APPS',
+        retentionPolicy: 'BUSINESS_3_YEAR',
+        classification: 'CONFIDENTIAL',
+        preserveFilename: true,
+        folderPath: `proofs/${row.proofType.replace(/\s+/g, '-').toLowerCase()}`,
+      });
+      await saveProofDocument({
+        reviewId: row.id,
+        fileId: result.file_id,
+        fileName: file.name,
+      });
+      await reviews.refetch();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploadingId(null);
+    }
+  }
 
   if (sessionLoading || parents.isLoading) {
     return (
@@ -168,19 +212,47 @@ export function SupplierProofsPage() {
                           : `requested ${shortDate(row.requestedAt)}`}
                       </p>
                     </div>
-                    <span className="shrink-0 text-[12.5px] font-semibold text-muted-foreground">
-                      {row.label}
-                    </span>
+                    {row.awaitingUpload ? (
+                      <Button
+                        asChild
+                        size="sm"
+                        aria-busy={uploadingId === row.id}
+                        className="shrink-0"
+                        data-testid={`upload-proof-${row.proofType}-r${row.round}`}
+                      >
+                        <label>
+                          {uploadingId === row.id ? 'Uploading…' : 'Upload artwork'}
+                          <input
+                            type="file"
+                            className="sr-only"
+                            aria-label={`Upload ${row.proofType} artwork, round ${row.round}`}
+                            disabled={uploadingId !== null}
+                            onChange={(e) => handleProofFile(row, e)}
+                          />
+                        </label>
+                      </Button>
+                    ) : (
+                      <span className="shrink-0 text-[12.5px] font-semibold text-muted-foreground">
+                        {row.label}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
-              {/* Upload is deliberately absent: proof documents go to Jiffy
-                  Drive under the client order's scope, and wiring a supplier
-                  write into that scope needs its own access decision. */}
-              <p className="mt-3 text-[11.5px] text-muted-foreground">
-                Send artwork to your Fiserv contact — supplier upload is not enabled on this
-                portal yet.
-              </p>
+              {uploadError ? (
+                <p
+                  className="mt-3 text-[12px] text-destructive"
+                  role="alert"
+                  data-testid="proof-upload-error"
+                >
+                  That upload did not go through ({uploadError}). The round is unchanged — try
+                  again.
+                </p>
+              ) : (
+                <p className="mt-3 text-[11.5px] text-muted-foreground">
+                  Uploading a file puts that round straight into review with your buyer.
+                </p>
+              )}
             </>
           )}
         </>

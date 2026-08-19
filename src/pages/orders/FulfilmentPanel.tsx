@@ -31,6 +31,11 @@ import {
 } from './order-api';
 import { money, unitMoney, type ChainState } from './deal-helpers';
 import { ChainBlock } from './ChainBlock';
+import { BulkDestinationsDialog } from './BulkDestinationsDialog';
+import { type BulkTarget, type ShipmentRecordPayload } from './shipment-bulk';
+import { shipmentExportRows, SHIPMENT_CSV_COLUMNS, shipmentGaps } from './shipment-export';
+import { toCsv, csvFilename } from '@/pages/_shared/csv';
+import { downloadTextFile } from '@/pages/_shared/download';
 import { ProofPanel } from './ProofPanel';
 import { PROOF_UI, buildProofs, statusAfterApproval } from './proof-helpers';
 import {
@@ -298,6 +303,7 @@ export function FulfilmentPanel({
   const [expenseQty, setExpenseQty] = useState('');
   const [expenseCost, setExpenseCost] = useState('');
   const [expensePrice, setExpensePrice] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const data = grid.data as FulfilmentGrid | null;
   const orders = useMemo(() => pickSupplyOrders(data), [data]);
@@ -310,6 +316,35 @@ export function FulfilmentPanel({
     () => forThisOrder(data?.shipment_records, supplyIds),
     [data, supplyIds],
   );
+  /**
+   * Every supply order with what it can still take — the input to bulk
+   * planning. Built from the same award/planned arithmetic the single-add
+   * form uses, so the two can never disagree about the cap.
+   */
+  const bulkTargets = useMemo<BulkTarget[]>(
+    () =>
+      orders.flatMap((o) => {
+        const id = o.child_order?.id;
+        const supplierId = o.child_order?.seller_party_id?.id;
+        if (!id || !supplierId) return [];
+        const awarded = workloads.find((w) => w.supplierId === supplierId)?.units ?? 0;
+        return [
+          {
+            supplyOrderId: id,
+            supplyOrderCode: o.child_order?.order_code ?? id,
+            unplanned: Math.max(0, awarded - plannedForSupplyOrder(records, id)),
+          },
+        ];
+      }),
+    [orders, workloads, records],
+  );
+
+  const exportRows = useMemo(
+    () => shipmentExportRows(records, data?.shipments ?? []),
+    [records, data],
+  );
+  const gaps = useMemo(() => shipmentGaps(exportRows), [exportRows]);
+
   const expenses = useMemo(() => forThisOrder(data?.expenses, supplyIds), [data, supplyIds]);
   const progress = useMemo(
     () => shipProgress(records, data?.shipments ?? []),
@@ -858,7 +893,70 @@ export function FulfilmentPanel({
               >
                 Add destination
               </Button>
+
+              {/* The one-at-a-time form above is right for a single
+                  destination; this is the twenty-four-row case it replaces. */}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || bulkTargets.length === 0}
+                data-testid="open-bulk-destinations"
+                onClick={() => setBulkOpen(true)}
+              >
+                Plan several
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={exportRows.length === 0}
+                data-testid="export-shipments-csv"
+                onClick={() =>
+                  downloadTextFile(
+                    csvFilename(`${orderCode ?? 'order'} shipments`, new Date().toISOString()),
+                    toCsv(exportRows, SHIPMENT_CSV_COLUMNS),
+                  )
+                }
+              >
+                Export CSV
+              </Button>
             </div>
+
+            {/* The gaps, stated rather than left to be counted off the table. */}
+            {exportRows.length > 0 ? (
+              <p className="text-[12px] text-muted-foreground" data-testid="shipment-gaps">
+                {gaps.destinations} destination{gaps.destinations === 1 ? '' : 's'}
+                {gaps.unshipped > 0 ? ` · ${gaps.unshipped} unshipped` : ''}
+                {gaps.partial > 0 ? ` · ${gaps.partial} partial` : ''}
+                {gaps.missingTracking > 0 ? ` · ${gaps.missingTracking} missing tracking` : ''}
+                {gaps.missingCost > 0 ? ` · ${gaps.missingCost} missing cost` : ''}
+                {gaps.unitsOutstanding > 0
+                  ? ` · ${gaps.unitsOutstanding.toLocaleString()} units outstanding`
+                  : ' · nothing outstanding'}
+              </p>
+            ) : null}
+
+            <BulkDestinationsDialog
+              open={bulkOpen}
+              onOpenChange={setBulkOpen}
+              targets={bulkTargets}
+              busy={busy}
+              onCreate={async (payloads: ShipmentRecordPayload[]) => {
+                await run('Destinations', async () => {
+                  // Sequential rather than parallel: each create re-reads the
+                  // planned total server-side, and firing them together would
+                  // let two rows both pass a cap only one of them can have.
+                  for (const payload of payloads) {
+                    await createShipmentRecord({
+                      supplyOrderId: payload.supplyOrderId,
+                      shipmentType: payload.shipmentType,
+                      destination: payload.destination,
+                      qty: payload.qty,
+                    });
+                  }
+                });
+              }}
+            />
             {overPlanned ? (
               <p className="text-[12px] text-destructive" role="alert" data-testid="ship-over-plan">
                 Only {shipUnplanned.toLocaleString()} of that supplier's award is still unplanned.
