@@ -1052,24 +1052,48 @@ export async function createOrderAndStartWorkflow(
   const assigned = Boolean(currentUserId);
 
   onStep?.('stage');
-  await runSavedQueryWithParams('tq_sub_task_add', {
-    instanceId,
-    subTaskName: INITIAL_STAGE,
-    stateName: INITIAL_STATE,
-  });
-
   onStep?.('workflow');
   try {
     // ASYNC: create_order parks on a signal wait at every stage, so a sync
     // call would hang until the whole order completed.
+    //
+    // The workflow opens the FIRST stage itself, exactly as it opens the other
+    // eight. Opening it here as well produced two `Order` sub-task instances
+    // on every order ever created: the one written here took `Order Received`
+    // and was then abandoned, while the workflow's own copy took
+    // `Order Received` → `Order In progress` and carried the rest of the
+    // process. Two rows where the model says one, and the orphan showed up as
+    // a duplicate entry in the Activity trail.
     await runWorkflow(CREATE_ORDER_WORKFLOW, { taskInstanceId: instanceId }, 'async');
   } catch (error) {
+    // The workflow never started, so nothing will open the first stage. Do it
+    // here instead: an order sitting at no stage at all cannot be worked or
+    // even rendered sensibly, which is worse than the duplicate this call used
+    // to cause. It is a fallback now rather than the normal path, so it can no
+    // longer collide with the workflow.
+    let stageError: string | null = null;
+    try {
+      await runSavedQueryWithParams('tq_sub_task_add', {
+        instanceId,
+        subTaskName: INITIAL_STAGE,
+        stateName: INITIAL_STATE,
+      });
+    } catch (fallback) {
+      stageError = fallback instanceof Error ? fallback.message : String(fallback);
+    }
+
+    const workflowError = error instanceof Error ? error.message : String(error);
     return {
       orderId,
       instanceId,
       assigned,
       workflowStarted: false,
-      workflowError: error instanceof Error ? error.message : String(error),
+      // Both failures are reported: if the stage fallback ALSO failed the
+      // order is genuinely stranded, and saying only "workflow failed" would
+      // understate it.
+      workflowError: stageError
+        ? `${workflowError} — and the opening stage could not be created either (${stageError}).`
+        : workflowError,
     };
   }
 
